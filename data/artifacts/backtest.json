@@ -1,0 +1,2268 @@
+{
+ "generated_at": "2026-09-17T19:01:33+00:00",
+ "targets": [
+  2021,
+  2022,
+  2023,
+  2024
+ ],
+ "holdout_target": null,
+ "rows": [
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 345,
+   "rmse": 0.03697165926827796,
+   "mae": 0.02927437710497669,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 345,
+   "rmse": 0.020284066899383356,
+   "mae": 0.015701104837984328,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 345,
+   "rmse": 0.013288093488660762,
+   "mae": 0.010641466414363558,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 345,
+   "rmse": 0.03366899553416589,
+   "mae": 0.026395843862728953,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "woba",
+   "n": 345,
+   "rmse": 0.03360062417354311,
+   "mae": 0.026129208621197934,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 327,
+   "rmse": 0.065151880499427,
+   "mae": 0.04456133130351871,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 327,
+   "rmse": 0.035440709357380654,
+   "mae": 0.026195954552643792,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 327,
+   "rmse": 0.020203536200718197,
+   "mae": 0.015613727961011254,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "last",
+   "stat": "babip",
+   "n": 327,
+   "rmse": 0.07327186337681689,
+   "mae": 0.05160850599130562,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "last",
+   "stat": "woba",
+   "n": 327,
+   "rmse": 0.06590106919472467,
+   "mae": 0.046641553739926,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 345,
+   "rmse": 0.05823137619661732,
+   "mae": 0.047078085785556445,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 345,
+   "rmse": 0.029102425244834952,
+   "mae": 0.022640399637706934,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 345,
+   "rmse": 0.01691606542575163,
+   "mae": 0.013998997828870026,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "league",
+   "stat": "babip",
+   "n": 345,
+   "rmse": 0.03652803500087067,
+   "mae": 0.029526322068864023,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "league",
+   "stat": "woba",
+   "n": 345,
+   "rmse": 0.03752884571413465,
+   "mae": 0.029433474672393774,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 345,
+   "rmse": 0.03634187906473132,
+   "mae": 0.028548908461918224,
+   "cov50": 0.5478260869565217,
+   "cov80": 0.8405797101449275,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 345,
+   "rmse": 0.02085231681355703,
+   "mae": 0.01593974382203566,
+   "cov50": 0.5594202898550724,
+   "cov80": 0.8231884057971014,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 345,
+   "rmse": 0.015325485209737496,
+   "mae": 0.012559090290047842,
+   "cov50": 0.4463768115942029,
+   "cov80": 0.7304347826086957,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 345,
+   "rmse": 0.03212248568136485,
+   "mae": 0.02515355171229456,
+   "cov50": 0.5159420289855072,
+   "cov80": 0.8202898550724638,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "woba",
+   "n": 345,
+   "rmse": 0.03575174724115396,
+   "mae": 0.028020449594041444,
+   "cov50": 0.4811594202898551,
+   "cov80": 0.7768115942028986,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.2016,
+     "divergences": 1
+    },
+    "bb": {
+     "max_rhat": 1.0406,
+     "divergences": 6
+    },
+    "hbp": {
+     "max_rhat": 1.0284,
+     "divergences": 1
+    },
+    "hr": {
+     "max_rhat": 1.0087,
+     "divergences": 0
+    },
+    "hit_bip": {
+     "max_rhat": 1.0639,
+     "divergences": 5
+    },
+    "xbh": {
+     "max_rhat": 1.0592,
+     "divergences": 0
+    },
+    "triple": {
+     "max_rhat": 1.0345,
+     "divergences": 0
+    }
+   }
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 329,
+   "rmse": 0.042759731987280114,
+   "mae": 0.033413225716835374,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 329,
+   "rmse": 0.02166634953730121,
+   "mae": 0.01712001807743791,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 329,
+   "rmse": 0.010833458962782719,
+   "mae": 0.00870832676005233,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 329,
+   "rmse": 0.03268183498749476,
+   "mae": 0.02603430639643253,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "fip",
+   "n": 329,
+   "rmse": 0.7830831619246663,
+   "mae": 0.6160143818458912,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 313,
+   "rmse": 0.06207472112987347,
+   "mae": 0.045927660627511,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 313,
+   "rmse": 0.047539469114999816,
+   "mae": 0.028902579483655162,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 313,
+   "rmse": 0.02457601687669667,
+   "mae": 0.01698775498799583,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "last",
+   "stat": "babip",
+   "n": 313,
+   "rmse": 0.08397349934195016,
+   "mae": 0.056078564975761386,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "last",
+   "stat": "fip",
+   "n": 313,
+   "rmse": 1.6951706573182308,
+   "mae": 1.2027041166999788,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 329,
+   "rmse": 0.05597564323964292,
+   "mae": 0.0435525416263123,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 329,
+   "rmse": 0.025466158038330994,
+   "mae": 0.020629306846299267,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 329,
+   "rmse": 0.011311023871310614,
+   "mae": 0.009164047806633272,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "league",
+   "stat": "babip",
+   "n": 329,
+   "rmse": 0.03235685183664125,
+   "mae": 0.02602273298902022,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "league",
+   "stat": "fip",
+   "n": 329,
+   "rmse": 0.8679521163417298,
+   "mae": 0.6885808563178423,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 329,
+   "rmse": 0.04209977963429163,
+   "mae": 0.032273854041975275,
+   "cov50": 0.5683890577507599,
+   "cov80": 0.8449848024316109,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 329,
+   "rmse": 0.02331452975550363,
+   "mae": 0.01772994858471847,
+   "cov50": 0.48936170212765956,
+   "cov80": 0.7598784194528876,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 329,
+   "rmse": 0.010519559412173182,
+   "mae": 0.008474728761767846,
+   "cov50": 0.48936170212765956,
+   "cov80": 0.7963525835866262,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 329,
+   "rmse": 0.032416823923075516,
+   "mae": 0.026110872034367884,
+   "cov50": 0.44072948328267475,
+   "cov80": 0.7629179331306991,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "fip",
+   "n": 329,
+   "rmse": 0.808062639315096,
+   "mae": 0.6479240659134111,
+   "cov50": 0.47720364741641336,
+   "cov80": 0.7507598784194529,
+   "diagnostics": null
+  },
+  {
+   "target": 2021,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.0457,
+     "divergences": 0
+    },
+    "bb": {
+     "max_rhat": 1.0231,
+     "divergences": 1
+    },
+    "hbp": {
+     "max_rhat": 1.0572,
+     "divergences": 1
+    },
+    "hr": {
+     "max_rhat": 1.1173,
+     "divergences": 1
+    },
+    "hit_bip": {
+     "max_rhat": 1.0398,
+     "divergences": 8
+    }
+   }
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 322,
+   "rmse": 0.03664542486954951,
+   "mae": 0.029091291558286658,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 322,
+   "rmse": 0.02018504932809818,
+   "mae": 0.01644476269339646,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 322,
+   "rmse": 0.01352145461833638,
+   "mae": 0.01119781048927585,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 322,
+   "rmse": 0.03265498310675324,
+   "mae": 0.02557218664896801,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "woba",
+   "n": 322,
+   "rmse": 0.03581541823508592,
+   "mae": 0.028712756811033045,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 321,
+   "rmse": 0.03890924724770642,
+   "mae": 0.03020455884724418,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 321,
+   "rmse": 0.027254959964141654,
+   "mae": 0.02038404909094616,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 321,
+   "rmse": 0.016623105915915176,
+   "mae": 0.012607977672909073,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "last",
+   "stat": "babip",
+   "n": 321,
+   "rmse": 0.04668510182527185,
+   "mae": 0.03538451510822168,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "last",
+   "stat": "woba",
+   "n": 321,
+   "rmse": 0.045495994739345874,
+   "mae": 0.03551688771021904,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 322,
+   "rmse": 0.06081874950821134,
+   "mae": 0.04964676317648846,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 322,
+   "rmse": 0.027769195690297857,
+   "mae": 0.02221038644881963,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 322,
+   "rmse": 0.016131258674050693,
+   "mae": 0.013248554809603116,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "league",
+   "stat": "babip",
+   "n": 322,
+   "rmse": 0.03575093032788596,
+   "mae": 0.028698915474455855,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "league",
+   "stat": "woba",
+   "n": 322,
+   "rmse": 0.03767865866488093,
+   "mae": 0.02967738516145288,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 322,
+   "rmse": 0.034619247842294164,
+   "mae": 0.02765110752840287,
+   "cov50": 0.4968944099378882,
+   "cov80": 0.8167701863354038,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 322,
+   "rmse": 0.02132832255787826,
+   "mae": 0.016768147439720403,
+   "cov50": 0.45652173913043476,
+   "cov80": 0.7670807453416149,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 322,
+   "rmse": 0.018948859838441433,
+   "mae": 0.015880305955840054,
+   "cov50": 0.3136645962732919,
+   "cov80": 0.5807453416149069,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 322,
+   "rmse": 0.031006111625037535,
+   "mae": 0.023974267279793647,
+   "cov50": 0.5403726708074534,
+   "cov80": 0.8229813664596274,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "woba",
+   "n": 322,
+   "rmse": 0.04148745915384436,
+   "mae": 0.0337285775452952,
+   "cov50": 0.3944099378881988,
+   "cov80": 0.7018633540372671,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.0408,
+     "divergences": 0
+    },
+    "bb": {
+     "max_rhat": 1.0614,
+     "divergences": 23
+    },
+    "hbp": {
+     "max_rhat": 1.0499,
+     "divergences": 0
+    },
+    "hr": {
+     "max_rhat": 1.0226,
+     "divergences": 1
+    },
+    "hit_bip": {
+     "max_rhat": 1.2313,
+     "divergences": 138
+    },
+    "xbh": {
+     "max_rhat": 1.1038,
+     "divergences": 0
+    },
+    "triple": {
+     "max_rhat": 1.114,
+     "divergences": 0
+    }
+   }
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 325,
+   "rmse": 0.042314368132511354,
+   "mae": 0.03281175018542459,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 325,
+   "rmse": 0.01971690618164525,
+   "mae": 0.01594643635588431,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 325,
+   "rmse": 0.011313961398795386,
+   "mae": 0.008871231561193496,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 325,
+   "rmse": 0.033002025812042826,
+   "mae": 0.025764656191860084,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "fip",
+   "n": 325,
+   "rmse": 0.8214145978192966,
+   "mae": 0.6510296842796386,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 317,
+   "rmse": 0.05338460410351379,
+   "mae": 0.038157630699587296,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 317,
+   "rmse": 0.03342533843706853,
+   "mae": 0.020327603424856868,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 317,
+   "rmse": 0.019065855451205673,
+   "mae": 0.012689776724153813,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "last",
+   "stat": "babip",
+   "n": 317,
+   "rmse": 0.0587217273227314,
+   "mae": 0.04097069856397691,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "last",
+   "stat": "fip",
+   "n": 317,
+   "rmse": 1.3296938956490807,
+   "mae": 0.8900215457005249,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 325,
+   "rmse": 0.05466031519702243,
+   "mae": 0.04284047343167045,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 325,
+   "rmse": 0.02493576408376172,
+   "mae": 0.02084188746533154,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 325,
+   "rmse": 0.012331908152130745,
+   "mae": 0.009923322975889468,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "league",
+   "stat": "babip",
+   "n": 325,
+   "rmse": 0.033678380496381416,
+   "mae": 0.026345704414449504,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "league",
+   "stat": "fip",
+   "n": 325,
+   "rmse": 0.9471426081536541,
+   "mae": 0.759287495068805,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 325,
+   "rmse": 0.041776523250887224,
+   "mae": 0.03129756681651798,
+   "cov50": 0.5692307692307692,
+   "cov80": 0.7876923076923077,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 325,
+   "rmse": 0.02096325928572062,
+   "mae": 0.016297009950884407,
+   "cov50": 0.48615384615384616,
+   "cov80": 0.8184615384615385,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 325,
+   "rmse": 0.011793853110590937,
+   "mae": 0.00943430316047528,
+   "cov50": 0.4492307692307692,
+   "cov80": 0.7138461538461538,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 325,
+   "rmse": 0.0329666376064763,
+   "mae": 0.02585211823829283,
+   "cov50": 0.4646153846153846,
+   "cov80": 0.7630769230769231,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "fip",
+   "n": 325,
+   "rmse": 0.8850142746926574,
+   "mae": 0.700650406882384,
+   "cov50": 0.4,
+   "cov80": 0.6707692307692308,
+   "diagnostics": null
+  },
+  {
+   "target": 2022,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.0419,
+     "divergences": 1
+    },
+    "bb": {
+     "max_rhat": 1.0158,
+     "divergences": 8
+    },
+    "hbp": {
+     "max_rhat": 1.036,
+     "divergences": 0
+    },
+    "hr": {
+     "max_rhat": 1.0271,
+     "divergences": 0
+    },
+    "hit_bip": {
+     "max_rhat": 1.1326,
+     "divergences": 18
+    }
+   }
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 335,
+   "rmse": 0.0368814569486586,
+   "mae": 0.029228679119460824,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 335,
+   "rmse": 0.020132438671805943,
+   "mae": 0.015332567519777168,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 335,
+   "rmse": 0.011873496152533964,
+   "mae": 0.009393147282463755,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 335,
+   "rmse": 0.03256094761684383,
+   "mae": 0.025972361427869774,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "woba",
+   "n": 335,
+   "rmse": 0.03038203557121097,
+   "mae": 0.02441507049919711,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 330,
+   "rmse": 0.04335521787268155,
+   "mae": 0.03111010486199646,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 330,
+   "rmse": 0.024993907854178765,
+   "mae": 0.018151170223765972,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 330,
+   "rmse": 0.01571962287809312,
+   "mae": 0.01169256202196321,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "last",
+   "stat": "babip",
+   "n": 330,
+   "rmse": 0.06717377252900622,
+   "mae": 0.03790546749105228,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "last",
+   "stat": "woba",
+   "n": 330,
+   "rmse": 0.04879785347255272,
+   "mae": 0.0340111651362674,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 335,
+   "rmse": 0.05935084492684932,
+   "mae": 0.0471109332119346,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 335,
+   "rmse": 0.02947228895431791,
+   "mae": 0.023734768590698174,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 335,
+   "rmse": 0.015468317196586255,
+   "mae": 0.012008965655241283,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "league",
+   "stat": "babip",
+   "n": 335,
+   "rmse": 0.03529209694677442,
+   "mae": 0.027052886011340642,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "league",
+   "stat": "woba",
+   "n": 335,
+   "rmse": 0.03619746941213975,
+   "mae": 0.02817668650057622,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 335,
+   "rmse": 0.03496901489433198,
+   "mae": 0.027885493121353223,
+   "cov50": 0.4955223880597015,
+   "cov80": 0.8417910447761194,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 335,
+   "rmse": 0.019943888095133245,
+   "mae": 0.01569204442851551,
+   "cov50": 0.5402985074626866,
+   "cov80": 0.808955223880597,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 335,
+   "rmse": 0.014425622218115091,
+   "mae": 0.01140182277339171,
+   "cov50": 0.4597014925373134,
+   "cov80": 0.7492537313432835,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 335,
+   "rmse": 0.03245119369310014,
+   "mae": 0.02519944526322488,
+   "cov50": 0.48955223880597015,
+   "cov80": 0.7940298507462686,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "woba",
+   "n": 335,
+   "rmse": 0.0333274268868029,
+   "mae": 0.026291008067667185,
+   "cov50": 0.4925373134328358,
+   "cov80": 0.8149253731343283,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.0741,
+     "divergences": 1
+    },
+    "bb": {
+     "max_rhat": 1.024,
+     "divergences": 15
+    },
+    "hbp": {
+     "max_rhat": 1.032,
+     "divergences": 2
+    },
+    "hr": {
+     "max_rhat": 1.0306,
+     "divergences": 2
+    },
+    "hit_bip": {
+     "max_rhat": 1.0946,
+     "divergences": 10
+    },
+    "xbh": {
+     "max_rhat": 1.0481,
+     "divergences": 3
+    },
+    "triple": {
+     "max_rhat": 1.1105,
+     "divergences": 0
+    }
+   }
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 334,
+   "rmse": 0.03841666715728199,
+   "mae": 0.030306106727787836,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 334,
+   "rmse": 0.021652630436456755,
+   "mae": 0.016484960462175895,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 334,
+   "rmse": 0.011580867783133391,
+   "mae": 0.009027683645807902,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 334,
+   "rmse": 0.03396539032768669,
+   "mae": 0.02641993057806133,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "fip",
+   "n": 334,
+   "rmse": 0.8388588891230699,
+   "mae": 0.6419747222863403,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 326,
+   "rmse": 0.04768655057424215,
+   "mae": 0.03520592131764372,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 326,
+   "rmse": 0.028098732402030344,
+   "mae": 0.020819822736239904,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 326,
+   "rmse": 0.01793691473631406,
+   "mae": 0.012854011527270316,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "last",
+   "stat": "babip",
+   "n": 326,
+   "rmse": 0.05048789774283984,
+   "mae": 0.03833231422974632,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "last",
+   "stat": "fip",
+   "n": 326,
+   "rmse": 1.1936335073727584,
+   "mae": 0.8717016346394713,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 334,
+   "rmse": 0.05144584120792776,
+   "mae": 0.04091473813729859,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 334,
+   "rmse": 0.025190143447252632,
+   "mae": 0.01952665515347285,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 334,
+   "rmse": 0.011377833564015194,
+   "mae": 0.008966192616672298,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "league",
+   "stat": "babip",
+   "n": 334,
+   "rmse": 0.031869153060492136,
+   "mae": 0.02449976714645664,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "league",
+   "stat": "fip",
+   "n": 334,
+   "rmse": 0.876893935049773,
+   "mae": 0.6956284618376969,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 334,
+   "rmse": 0.037773053724797966,
+   "mae": 0.02909713237608314,
+   "cov50": 0.562874251497006,
+   "cov80": 0.8143712574850299,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 334,
+   "rmse": 0.023099027236202985,
+   "mae": 0.017575266265682593,
+   "cov50": 0.4880239520958084,
+   "cov80": 0.7365269461077845,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 334,
+   "rmse": 0.01101846710139697,
+   "mae": 0.008596133186357262,
+   "cov50": 0.49700598802395207,
+   "cov80": 0.7664670658682635,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 334,
+   "rmse": 0.03178470007948098,
+   "mae": 0.02427804884059844,
+   "cov50": 0.5179640718562875,
+   "cov80": 0.781437125748503,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "fip",
+   "n": 334,
+   "rmse": 0.82256113933014,
+   "mae": 0.6262529323689143,
+   "cov50": 0.44610778443113774,
+   "cov80": 0.7395209580838323,
+   "diagnostics": null
+  },
+  {
+   "target": 2023,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.013,
+     "divergences": 0
+    },
+    "bb": {
+     "max_rhat": 1.0446,
+     "divergences": 1
+    },
+    "hbp": {
+     "max_rhat": 1.0262,
+     "divergences": 0
+    },
+    "hr": {
+     "max_rhat": 1.1027,
+     "divergences": 0
+    },
+    "hit_bip": {
+     "max_rhat": 1.032,
+     "divergences": 2
+    }
+   }
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 348,
+   "rmse": 0.03487869610764285,
+   "mae": 0.027196376184138393,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 348,
+   "rmse": 0.018969146416665823,
+   "mae": 0.015245419536209587,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 348,
+   "rmse": 0.010973828816105442,
+   "mae": 0.008791149738994098,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 348,
+   "rmse": 0.0337753860856787,
+   "mae": 0.02652804009992775,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "marcel",
+   "stat": "woba",
+   "n": 348,
+   "rmse": 0.03371639585368395,
+   "mae": 0.026712279527071073,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 344,
+   "rmse": 0.03998134621866948,
+   "mae": 0.029485071329920745,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 344,
+   "rmse": 0.02583227806235341,
+   "mae": 0.018695164072916923,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 344,
+   "rmse": 0.015063464480934236,
+   "mae": 0.011305076446693164,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "last",
+   "stat": "babip",
+   "n": 344,
+   "rmse": 0.054702869522509905,
+   "mae": 0.038393677450003896,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "last",
+   "stat": "woba",
+   "n": 344,
+   "rmse": 0.04778708328979965,
+   "mae": 0.03537255783552959,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 348,
+   "rmse": 0.05866617225188668,
+   "mae": 0.047705320301646315,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 348,
+   "rmse": 0.026505010529786578,
+   "mae": 0.021260846449261003,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 348,
+   "rmse": 0.014183631344299228,
+   "mae": 0.011075406908820567,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "league",
+   "stat": "babip",
+   "n": 348,
+   "rmse": 0.033692251382601575,
+   "mae": 0.02663496749960656,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "league",
+   "stat": "woba",
+   "n": 348,
+   "rmse": 0.037158045985774026,
+   "mae": 0.02816289943323108,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 348,
+   "rmse": 0.03398573220347412,
+   "mae": 0.026127663523938006,
+   "cov50": 0.5574712643678161,
+   "cov80": 0.8333333333333334,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 348,
+   "rmse": 0.019351063683891872,
+   "mae": 0.015521545687575949,
+   "cov50": 0.5201149425287356,
+   "cov80": 0.7672413793103449,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 348,
+   "rmse": 0.013170702096280972,
+   "mae": 0.0105213225904834,
+   "cov50": 0.47413793103448276,
+   "cov80": 0.7672413793103449,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 348,
+   "rmse": 0.03150287986915993,
+   "mae": 0.024602914520804188,
+   "cov50": 0.48563218390804597,
+   "cov80": 0.7787356321839081,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "woba",
+   "n": 348,
+   "rmse": 0.03498681627782543,
+   "mae": 0.02793606197305415,
+   "cov50": 0.45977011494252873,
+   "cov80": 0.7442528735632183,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "H",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.094,
+     "divergences": 1
+    },
+    "bb": {
+     "max_rhat": 1.0044,
+     "divergences": 3
+    },
+    "hbp": {
+     "max_rhat": 1.035,
+     "divergences": 0
+    },
+    "hr": {
+     "max_rhat": 1.0582,
+     "divergences": 17
+    },
+    "hit_bip": {
+     "max_rhat": 1.0293,
+     "divergences": 28
+    },
+    "xbh": {
+     "max_rhat": 1.0471,
+     "divergences": 0
+    },
+    "triple": {
+     "max_rhat": 1.2309,
+     "divergences": 0
+    }
+   }
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "k_pct",
+   "n": 332,
+   "rmse": 0.036575882760217414,
+   "mae": 0.027744661391268095,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "bb_pct",
+   "n": 332,
+   "rmse": 0.019353855314641528,
+   "mae": 0.015248648467456022,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "hr_pct",
+   "n": 332,
+   "rmse": 0.009767628959910716,
+   "mae": 0.007491653804488745,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "babip",
+   "n": 332,
+   "rmse": 0.034049594712266144,
+   "mae": 0.026112691105008003,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "marcel",
+   "stat": "fip",
+   "n": 332,
+   "rmse": 0.7356047193071159,
+   "mae": 0.5581272490053659,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "last",
+   "stat": "k_pct",
+   "n": 318,
+   "rmse": 0.04395254140719075,
+   "mae": 0.03336602851552279,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "last",
+   "stat": "bb_pct",
+   "n": 318,
+   "rmse": 0.028714852260499853,
+   "mae": 0.02037532238643875,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "last",
+   "stat": "hr_pct",
+   "n": 318,
+   "rmse": 0.014739559148766092,
+   "mae": 0.011002635980763793,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "last",
+   "stat": "babip",
+   "n": 318,
+   "rmse": 0.05214489371478077,
+   "mae": 0.037322544603795416,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "last",
+   "stat": "fip",
+   "n": 318,
+   "rmse": 1.03084598755439,
+   "mae": 0.7732581926201005,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "league",
+   "stat": "k_pct",
+   "n": 332,
+   "rmse": 0.048151073213812484,
+   "mae": 0.03763149954336387,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "league",
+   "stat": "bb_pct",
+   "n": 332,
+   "rmse": 0.023142344736289483,
+   "mae": 0.018820050523645847,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "league",
+   "stat": "hr_pct",
+   "n": 332,
+   "rmse": 0.01015065259986254,
+   "mae": 0.007827320288368876,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "league",
+   "stat": "babip",
+   "n": 332,
+   "rmse": 0.03378090491476566,
+   "mae": 0.02585332560970191,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "league",
+   "stat": "fip",
+   "n": 332,
+   "rmse": 0.8008320647924456,
+   "mae": 0.6321095345065152,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "k_pct",
+   "n": 332,
+   "rmse": 0.037082680769961296,
+   "mae": 0.027954491327415735,
+   "cov50": 0.5783132530120482,
+   "cov80": 0.8373493975903614,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "bb_pct",
+   "n": 332,
+   "rmse": 0.020510278419307613,
+   "mae": 0.015850684075647888,
+   "cov50": 0.5030120481927711,
+   "cov80": 0.8132530120481928,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "hr_pct",
+   "n": 332,
+   "rmse": 0.00958103436564061,
+   "mae": 0.007348794004756912,
+   "cov50": 0.5301204819277109,
+   "cov80": 0.822289156626506,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "babip",
+   "n": 332,
+   "rmse": 0.033056593721797686,
+   "mae": 0.025194445965851298,
+   "cov50": 0.47289156626506024,
+   "cov80": 0.7710843373493976,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "fip",
+   "n": 332,
+   "rmse": 0.7627681207086131,
+   "mae": 0.5881835132045952,
+   "cov50": 0.4457831325301205,
+   "cov80": 0.7409638554216867,
+   "diagnostics": null
+  },
+  {
+   "target": 2024,
+   "role": "P",
+   "tier": "tier2",
+   "stat": "_diagnostics",
+   "n": null,
+   "rmse": null,
+   "mae": null,
+   "cov50": null,
+   "cov80": null,
+   "diagnostics": {
+    "k": {
+     "max_rhat": 1.0352,
+     "divergences": 2
+    },
+    "bb": {
+     "max_rhat": 1.0187,
+     "divergences": 10
+    },
+    "hbp": {
+     "max_rhat": 1.1118,
+     "divergences": 2
+    },
+    "hr": {
+     "max_rhat": 1.0389,
+     "divergences": 0
+    },
+    "hit_bip": {
+     "max_rhat": 1.0521,
+     "divergences": 1
+    }
+   }
+  }
+ ],
+ "gates": {
+  "H": {
+   "tier2": {
+    "pass": false,
+    "wins": 0,
+    "of": 4,
+    "need": 3,
+    "cov80_mean": 0.7594632987344281,
+    "vs": "marcel",
+    "targets_scored": [
+     2021,
+     2022,
+     2023,
+     2024
+    ]
+   },
+   "tier3": null
+  },
+  "P": {
+   "tier2": {
+    "pass": false,
+    "wins": 1,
+    "of": 4,
+    "need": 3,
+    "cov80_mean": 0.7255034806735506,
+    "vs": "marcel",
+    "targets_scored": [
+     2021,
+     2022,
+     2023,
+     2024
+    ]
+   },
+   "tier3": null
+  }
+ },
+ "production_tier": {
+  "H": "marcel",
+  "P": "marcel"
+ }
+}
