@@ -26,12 +26,12 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- `make test`      # should now be 11 tests (7 existing + 4 new leakage tests, ~35 s)
-- `make backtest`  # 4 targets x 2 roles x 12 stages = 48 fits. Estimated 60-110 min on the Air.
-  Leave it running; it prints a progress line per fit. Watch for `<-- CHECK` (r_hat > 1.05).
-- Paste the final summary table + the `gates` lines into "Results" below.
-- Then: Opus session for P3 (production artifacts). Do NOT run `make holdout` yet — the pipeline
-  refuses it until dev gates exist, and MANUAL §6 spends it only once.
+- P2 make backtest: done. Gates recorded → production = Marcel for both roles.
+- Kick off a fresh Opus session for **P3** (production artifacts) with the standard kickoff prompt in
+  MANUAL §11. P3 must read §5.3, §5.5, §5.6, §7 and write projections that use Marcel points +
+  Tier 2 bands (per §6 fallback), then `make project` (long, Daniel-run).
+- Do NOT run `make holdout` yet — MANUAL §6 spends it once, and it makes sense to spend it after
+  Fable Mission 2 attempts to fix Tier 2 (right now the holdout would just reconfirm Marcel).
 
 ## Results (paste summaries here, ≤ 30 lines each)
 
@@ -59,6 +59,20 @@
 **These are not results** — 150 draws, one target, r_hat 1.05–1.67. They say the harness runs and
 is calibrated (cov80 0.74–0.84 at nominal 0.80). `make backtest` produces the real numbers.
 
+### P2 backtest full run (Daniel, 2026-09-17, 4 targets × both roles × all stages, 500 draws)
+Key-stat RMSE per target (n ≈ 322–348 for H, 325–334 for P):
+
+    H wOBA   2021 marcel .0336 tier2 .0358   2022 marcel .0358 tier2 .0415
+             2023 marcel .0304 tier2 .0333   2024 marcel .0337 tier2 .0350
+    P FIP    2021 marcel .7831 tier2 .8081   2022 marcel .8214 tier2 .8850
+             2023 marcel .8389 tier2 .8226*  2024 marcel .7356 tier2 .7628
+             (* = the only Tier 2 win)
+
+Gates → **H: Marcel** (0/4 wins, need 3; cov80 mean .759 ✓).
+       **P: Marcel** (1/4 wins, need 3; cov80 mean .726 ✗ below .75).
+Production tier for both roles = Marcel (points) with Tier 2 bands, per MANUAL §6. This is the
+motivation for Fable Mission 2a — the model as specified doesn't beat Marcel head-to-head.
+
 Correctness checks that do stand:
 - The stage chain reproduces the FanGraphs wOBA formula and FIP to machine precision
   (max |diff| 1.7e-16 and 8.9e-16 over all 2024 players) — actual, projected and simulated
@@ -68,8 +82,11 @@ Correctness checks that do stand:
 - 4 leakage tests pass, including an end-to-end one: season-T counts rewritten (every player
   handed another player's line, league K collapsed to 2% of PA) changes no projection at all.
 
-## Gates / production tier
-- Hitters: TBD · Pitchers: TBD  (computed automatically into `backtest.json` by `make backtest`)
+## Gates / production tier (from `data/artifacts/backtest.json`, 2026-09-17)
+- **Hitters: Marcel** — Tier 2 fails (0/4 targets beat Marcel on wOBA RMSE; cov80 mean 0.759 ✓ in [0.75, 0.85]).
+- **Pitchers: Marcel** — Tier 2 fails (1/4 targets, only 2023, beat Marcel on FIP RMSE; cov80 mean 0.726 ✗ below 0.75).
+- Per MANUAL §6, production ships Marcel points with Tier 2 bands; Methodology page must say so plainly.
+- Tier 3 not evaluated yet (Phase 6 will regenerate gates with `--tier 3`).
 
 ## Decisions (one line each: date — decision — why)
 - 2026-09-17 — Reference model verified on simulated data (0 divergences, 80% coverage 0.83) — MANUAL §5.3
