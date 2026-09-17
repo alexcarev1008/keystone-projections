@@ -29,6 +29,16 @@ PITCHER_STAGES = ["k", "bb", "hbp", "hr", "hit_bip"]
 PARK_STAGES = {"hr", "hit_bip", "xbh", "triple"}
 
 
+def pa_prime(df: pd.DataFrame, role: str) -> pd.Series:
+    """PA' (hitters) / BF' (pitchers): the denominator every stage chain starts from.
+
+    PA' = PA - IBB - SH - CI, i.e. AB + uBB + HBP + SF -- the wOBA denominator.
+    """
+    base = df.plateAppearances if role == "H" else df.battersFaced
+    return (base - df.intentionalWalks - df.sacBunts
+            - df.catchersInterference).clip(lower=0).astype("int64")
+
+
 def stage_counts(df: pd.DataFrame, role: str) -> pd.DataFrame:
     """Return long table: one row per (input row, stage) with columns stage, y, n.
 

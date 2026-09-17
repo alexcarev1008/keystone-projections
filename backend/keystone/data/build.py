@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from keystone import config as C
-from keystone.components import stage_counts
+from keystone.components import pa_prime, stage_counts
 from keystone.data import mlb_api
 from keystone.league import hitter_constants, pitcher_constants, stage_league_rates
 
@@ -24,7 +24,7 @@ PA_COL = {"H": "plateAppearances", "P": "battersFaced"}
 
 
 def _pa_prime(df: pd.DataFrame, role: str) -> pd.Series:
-    return (df[PA_COL[role]] - df.intentionalWalks - df.sacBunts - df.catchersInterference).clip(lower=0).astype("int64")
+    return pa_prime(df, role)
 
 
 def _load_bulk(seasons: list[int], role: str) -> pd.DataFrame:

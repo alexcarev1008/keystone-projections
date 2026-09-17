@@ -1,6 +1,6 @@
-"""KEYSTONE CLI. Phase 1 subcommands: fetch, build.
+"""KEYSTONE CLI. Subcommands: fetch, build (Phase 1) · backtest, holdout (Phase 2).
 
-Later phases add: backtest | holdout | project | statcast | diagnostics.
+Later phases add: project | statcast | diagnostics.
 """
 from __future__ import annotations
 
@@ -53,6 +53,34 @@ def cmd_build(args: argparse.Namespace) -> None:
     build_mod.build_all(C.PROCESSED, seasons)
 
 
+def cmd_backtest(args: argparse.Namespace) -> None:
+    from keystone.eval import backtest as bt
+
+    C.ensure_dirs()
+    bt.run(targets=args.targets, tier=args.tier, quick=args.quick, roles=args.roles,
+           stages=args.stages, out=args.out, seed=args.seed)
+
+
+def cmd_holdout(args: argparse.Namespace) -> None:
+    """The 2025 holdout: allowed exactly once, and only after the gates are on disk."""
+    from keystone.eval import backtest as bt
+
+    C.ensure_dirs()
+    path = args.out or (C.ARTIFACTS / "backtest.json")
+    if not path.exists():
+        sys.exit(f"[holdout] {path} not found — run `make backtest` and record the gates first")
+    import json
+
+    prev = json.loads(path.read_text())
+    if not any(v for role in prev.get("gates", {}).values() for v in role.values()):
+        sys.exit("[holdout] no gates recorded yet — MANUAL.md §6 says the holdout runs ONCE, "
+                 "after the dev gates are decided")
+    if prev.get("holdout_target") is not None and not args.force:
+        sys.exit(f"[holdout] already run on {prev['holdout_target']}. The holdout is a one-shot "
+                 f"by design; pass --force only if you know why.")
+    bt.run(targets=[args.target], tier=args.tier, out=path, holdout=True, seed=args.seed)
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="keystone.pipeline")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -66,6 +94,26 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--start", type=int, default=C.SEASON_START)
     b.add_argument("--end", type=int, default=C.SEASON_END)
     b.set_defaults(func=cmd_build)
+
+    k = sub.add_parser("backtest", help="rolling-origin backtest on the dev targets (§6)")
+    k.add_argument("--targets", type=int, nargs="+", default=None,
+                   help=f"default {list(C.DEV_TARGETS)}")
+    k.add_argument("--tier", type=int, default=2, choices=(2, 3))
+    k.add_argument("--quick", action="store_true",
+                   help="smoke test: 2024, hitters, stages k+hr, 150 draws -> backtest_quick.json")
+    k.add_argument("--roles", nargs="+", default=None, choices=("H", "P"))
+    k.add_argument("--stages", nargs="+", default=None)
+    k.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
+    k.add_argument("--seed", type=int, default=1)
+    k.set_defaults(func=cmd_backtest)
+
+    h = sub.add_parser("holdout", help="score the held-out season once (§6)")
+    h.add_argument("--target", type=int, default=C.HOLDOUT_TARGET)
+    h.add_argument("--tier", type=int, default=2, choices=(2, 3))
+    h.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
+    h.add_argument("--seed", type=int, default=1)
+    h.add_argument("--force", action="store_true")
+    h.set_defaults(func=cmd_holdout)
 
     args = ap.parse_args(argv)
     args.func(args)
