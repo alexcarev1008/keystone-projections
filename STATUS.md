@@ -4,7 +4,7 @@
 - [x] P0 Setup (Daniel): `make setup`, `make test` (7 pass), fg_guts.csv saved, git init
 - [x] P1 Data layer
 - [x] P2 Backtest harness (Tier 1 + 2)
-- [ ] P3 Production artifacts
+- [x] P3 Production artifacts
 - [ ] P4 API
 - [ ] P5 Frontend (+ screenshots in docs/screenshots/)
 - [ ] P6 Statcast data + Tier 3 plumbing
@@ -26,16 +26,13 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- Nothing to run right now. P2 is complete and `data/artifacts/backtest.json` holds the gates.
-- **Do NOT run `make holdout`.** §10 P2 permits it now that gates exist, but Stage B M2b spends
-  the holdout after Fable iterates the model. Scoring 2025 against a model that is about to change
-  wastes a one-shot. `pipeline holdout` refuses a second run without `--force`.
-- Next Opus session, pick one:
-  - **P6 + P6.5** (Statcast + `make diagnostics`) to unblock Fable M1/M2a soonest — the failed
-    gates are exactly M1's input, and M1 cannot start without the context pack.
-  - **P3** (production artifacts) to keep the app moving; §6 now routes it to Marcel points with
-    Tier 2 bands.
-  P6/P6.5 first is the better order: M1 may change the model, and P3 would then be rebuilt.
+- **`make project`** (20–40 min, 4 chains × 500 draws over 12 fits) → writes the 6 parquet
+  artifacts + `meta.json` to `data/artifacts/`. `--quick` still writes to `data/artifacts/_quick/`
+  so it can never overwrite a real production run.
+- Paste `[project]` output (the fit lines and spot checks) into "Results" below.
+- **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
+- Next Opus session after `make project`: pick either P4 (API) or P6+P6.5 (Statcast + Fable
+  context pack). P6.5 unblocks Fable M1/M2a; P4 is required before the frontend in P5.
 
 ## Results (paste summaries here, ≤ 30 lines each)
 
@@ -108,6 +105,17 @@ r_hat 1.05**. Concentrated, not diffuse:
 H/hit_bip alone is 58% of all divergences. The verified simulation had 0 at this scale, so this is
 real-data structure the parameterisation does not absorb.
 
+### P3 production pipeline — agent smoke test (2026-09-17, `project --quick`)
+`--quick` fits hitters, 200 players, stages k+hr, 150 draws × 2 chains — writes every artifact
+into `data/artifacts/_quick/` so a real `make project` is never overwritten.
+- Runtime: ~40 s per stage, ~1.5 min total (well under the 5-min agent budget).
+- Schema check passes for all 6 parquet files + meta.json (columns per §7).
+- Fit r_hat 1.14 / 1.17 at quick sampling — expected; production uses 500 draws × 4 chains.
+- `projections.parquet` emits `stage_k` and `stage_hr` rows in partial mode (like backtest quick);
+  the full run emits derived stats (k_pct, bb_pct, hr_pct, babip, avg, obp, slg, iso, woba for H;
+  k_pct, bb_pct, hr_pct, babip, k_minus_bb, fip, era for P).
+- 11 tests still pass.
+
 ## Gates / production tier (from `data/artifacts/backtest.json`, 2026-09-17)
 - **Hitters: Marcel** — Tier 2 fails: 0/4 targets beat Marcel on wOBA RMSE (need 3).
   cov80 mean .759 ✓ in [0.75, 0.85], so hitters fail on accuracy only, not calibration.
@@ -132,6 +140,11 @@ real-data structure the parameterisation does not absorb.
 - 2026-09-17 — P2: `make holdout` refuses to run unless `backtest.json` exists with gates recorded, and refuses a second run without `--force`. MANUAL §6 spends the holdout once.
 - 2026-09-17 — P2 result: Tier 2 fails both gates on the dev targets, so production is Marcel points + Tier 2 bands per §6. Recorded as measured — no tuning, no re-running with different settings.
 - 2026-09-17 — The 2025 holdout stays **unspent** until after Fable M2b. §10 P2 permits it now, but M2a/M2b will change the model, and a one-shot holdout scored against a superseded model is wasted.
+- 2026-09-17 — P3: production_tier=marcel triggers the §6 fallback. Implementation shifts each Tier 2 stage draw in **logit space** by `logit(Marcel_h1) − logit(median(Tier2_h1))` per (player, stage), leaving Tier 2's aging trajectory and posterior spread intact. Result: q50 at h=1 = Marcel_h1 (up to round-off); bands at h=1 = Tier 2's spread anchored at Marcel; h=2..4 propagate Tier 2's aging drift from the Marcel anchor. If tier2 ever passes, the shift is bypassed and Tier 2 is used directly.
+- 2026-09-17 — P3: `project --quick` writes to `data/artifacts/_quick/` (never `data/artifacts/`) so a smoke test cannot overwrite a real production run. Same schema, same writer.
+- 2026-09-17 — P3: waterfall (§5.5) and derived aging curves (§5.6) emit rows only when every stage is fit (production run). `--quick` writes empty parquet files with the correct column schema so the check passes.
+- 2026-09-17 — P3: `history.parquet` includes raw stage counts (`k_y`, `k_n`, ...) alongside derived rates. Small extra bytes; makes the API and Methodology tables reconstruct-from-source without re-reading `player_season_{H,P}`.
+- 2026-09-17 — P3: FIP in projections and history is rebased on each player's Marcel PT (h=1) or actual IP (history) to match the P2 convention (§6 requires it for simulations).
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

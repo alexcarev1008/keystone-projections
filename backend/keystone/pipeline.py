@@ -1,6 +1,6 @@
-"""KEYSTONE CLI. Subcommands: fetch, build (Phase 1) · backtest, holdout (Phase 2).
+"""KEYSTONE CLI. Subcommands: fetch, build (P1) · backtest, holdout (P2) · project (P3).
 
-Later phases add: project | statcast | diagnostics.
+Later phases add: statcast | diagnostics.
 """
 from __future__ import annotations
 
@@ -61,6 +61,14 @@ def cmd_backtest(args: argparse.Namespace) -> None:
            stages=args.stages, out=args.out, seed=args.seed)
 
 
+def cmd_project(args: argparse.Namespace) -> None:
+    from keystone import project as proj
+
+    C.ensure_dirs()
+    proj.run(window_end=args.window_end, horizons=args.horizons, quick=args.quick,
+             out=args.out, seed=args.seed)
+
+
 def cmd_holdout(args: argparse.Namespace) -> None:
     """The 2025 holdout: allowed exactly once, and only after the gates are on disk."""
     from keystone.eval import backtest as bt
@@ -106,6 +114,15 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
     k.add_argument("--seed", type=int, default=1)
     k.set_defaults(func=cmd_backtest)
+
+    p = sub.add_parser("project", help="write production artifacts to data/artifacts/ (§7)")
+    p.add_argument("--window-end", type=int, default=C.SEASON_END)
+    p.add_argument("--horizons", type=int, default=4)
+    p.add_argument("--quick", action="store_true",
+                   help="smoke test: hitters, 200 players, 2 stages, 150 draws")
+    p.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
+    p.add_argument("--seed", type=int, default=1)
+    p.set_defaults(func=cmd_project)
 
     h = sub.add_parser("holdout", help="score the held-out season once (§6)")
     h.add_argument("--target", type=int, default=C.HOLDOUT_TARGET)
