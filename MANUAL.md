@@ -117,7 +117,8 @@ Frontend: Node ≥ 20.19, Vite 8 (react-ts template), React 19, react-router-dom
 | Need | Endpoint | Notes |
 |---|---|---|
 | Teams + home venue per season | `/api/v1/teams?sportId=1&season=Y` | `teams[].venue.id`; handles the A's (Sutter Health Park 2025) and Rays (Steinbrenner Field 2025) moves |
-| Player counts **per team** | `/api/v1/stats?stats=season&group={hitting,pitching}&season=Y&sportId=1&playerPool=ALL&teamId=T&limit=500` | A traded player appears under each team with that team's PA (Chisholm 2024: MIA 430 + NYY 191) |
+| Player season totals | `/api/v1/stats?stats=season&group={hitting,pitching}&season=Y&sportId=1&playerPool=ALL&limit=500&offset=N` (paginate to `totalSplits`) | **Use this, not `teamId=`.** One row per player = SEASON TOTALS, with `team` = his last team and `numTeams` (verified 2026-09-17: Justin Turner 2024, numTeams 2, 539 PA, team = Seattle). 2024 hitting totalSplits = 742. The `teamId=` variant silently undercounts (one team returned 27 splits / 5,164 PA against a team total of 6,245). |
+| Per-team splits (only for `numTeams > 1`) | `/api/v1/people/{id}/stats?stats=season&group=…&season=Y` | Returns a totals split (no `team` key) plus one split per team — use these for park exposure shares only. Roughly 100–150 players per season per group, so cache them. Fallback if this is too slow: give the player his last team's park for the whole season and note it as a limitation. |
 | Team totals (sanity check) | `/api/v1/teams/stats?stats=season&group=hitting&season=Y&sportIds=1` | 2024 league PA = 181,516 |
 | Bios | `/api/v1/people?personIds=a,b,…` | `birthDate`, `primaryPosition.abbreviation` (`P`, `TWP`, …), `batSide.code`, `pitchHand.code` |
 | wOBA weights | FanGraphs Guts page, **saved by hand** | Automated access is blocked (403) — don't scrape |
@@ -421,7 +422,7 @@ MiLB translations, pitch-level Stuff+ indicators). 👤 After the 2026 regular s
 - arviz 1.0 is a breaking refactor → keep arviz < 1.
 - FanGraphs and Savant block non-browser clients from some networks. FanGraphs data comes from the hand-saved CSV only;
   Savant goes through pybaseball (it has worked on Daniel's Mac before).
-- The Stats API bulk `/stats` without `teamId` behaves differently for traded players — always query per team and sum.
+- Never build season totals from `teamId=`-filtered `/stats` calls: they undercount (they appear to cover only players still with that organisation). Page the unfiltered bulk endpoint instead, and resolve team shares player-by-player for `numTeams > 1`.
 - 2020 (60 games) stays in the data; small n is handled naturally by the binomial likelihood. Never drop it silently.
 - Position players pitching and pitchers hitting are filtered by `primary_pos` (§4.3), not by stat thresholds.
 - Age = age on June 30. Ohtani (born July 5, 1994) is 29 in 2024.

@@ -4,8 +4,12 @@ Endpoints + field names were checked against live responses on 2026-09-17 (see M
 has NOT been executed against the network yet — Phase 1 runs it. If something breaks, fix the smallest thing.
 
 Key facts verified:
-  * /stats?stats=season&group={hitting|pitching}&season=Y&sportId=1&playerPool=ALL&teamId=T
-    returns one split per player FOR THAT TEAM (traded players appear under each team with that team's PA).
+  * /stats?stats=season&group={hitting|pitching}&season=Y&sportId=1&playerPool=ALL&limit=500&offset=N
+    returns ONE split per player with SEASON TOTALS, plus numTeams and team = his last team
+    (Justin Turner 2024: numTeams 2, 539 PA, team Seattle). 2024 hitting totalSplits = 742.
+    The teamId= variant UNDERCOUNTS (one team: 27 splits / 5,164 PA vs a team total of 6,245) - do not use it.
+  * /people/{id}/stats?stats=season&group=..&season=Y returns a totals split (no team key) plus one split
+    per team - the only reliable source of per-team shares, needed only when numTeams > 1.
   * /teams?sportId=1&season=Y gives each team's home venue for that season (ATH 2025 = Sutter Health Park).
   * /people?personIds=a,b gives birthDate, primaryPosition.abbreviation ('P', 'TWP', '2B', ...), batSide, pitchHand.
   * /teams/stats?stats=season&group=hitting&season=Y&sportIds=1 gives team totals (2024 sum PA = 181,516).
@@ -63,26 +67,48 @@ def teams(season: int) -> pd.DataFrame:
                           "venue_id": t["venue"]["id"], "venue_name": t["venue"]["name"]} for t in js["teams"]])
 
 
-def player_team_stats(season: int, group: str) -> pd.DataFrame:
-    """One row per (player, team) for a season. group: 'hitting' | 'pitching'."""
+def player_season_stats(season: int, group: str) -> pd.DataFrame:
+    """One row per player for a season (SEASON TOTALS). group: 'hitting' | 'pitching'.
+
+    Pages the unfiltered bulk endpoint. Never use teamId= for totals: it undercounts (MANUAL.md §4.1).
+    Columns: season, mlbam_id, name, last_team_id, num_teams, + the count columns for that group.
+    """
     cols = HIT_COLS if group == "hitting" else PIT_COLS
-    out = []
-    for team_id in teams(season).team_id:
-        offset = 0
-        while True:
-            params = {"stats": "season", "group": group, "season": season, "sportId": 1,
-                      "playerPool": "ALL", "teamId": int(team_id), "limit": 500, "offset": offset}
-            block = _get("/stats", params, season)["stats"][0]
-            splits = block.get("splits", [])
-            for sp in splits:
-                row = {"season": season, "team_id": int(team_id), "mlbam_id": sp["player"]["id"],
-                       "name": sp["player"]["fullName"]}
-                row.update({c: int(sp["stat"].get(c, 0) or 0) for c in cols})
-                out.append(row)
-            offset += len(splits)
-            if not splits or offset >= block.get("totalSplits", 0):
-                break
-    return pd.DataFrame(out)
+    out, offset = [], 0
+    while True:
+        params = {"stats": "season", "group": group, "season": season, "sportId": 1,
+                  "playerPool": "ALL", "limit": 500, "offset": offset}
+        block = _get("/stats", params, season)["stats"][0]
+        splits = block.get("splits", [])
+        for sp in splits:
+            row = {"season": season, "mlbam_id": sp["player"]["id"], "name": sp["player"]["fullName"],
+                   "last_team_id": (sp.get("team") or {}).get("id"), "num_teams": int(sp.get("numTeams", 1) or 1)}
+            row.update({c: int(sp["stat"].get(c, 0) or 0) for c in cols})
+            out.append(row)
+        offset += len(splits)
+        if not splits or offset >= block.get("totalSplits", 0):
+            break
+    df = pd.DataFrame(out)
+    if df.mlbam_id.duplicated().any():          # the bulk endpoint must return each player once
+        raise ValueError(f"duplicate players in bulk {group} {season}")
+    return df
+
+
+def player_team_splits(mlbam_id: int, season: int, group: str) -> pd.DataFrame:
+    """Per-team splits for ONE player-season — call only when num_teams > 1 (about 100-150 players
+    per season per group). Returns season, mlbam_id, team_id, pa (PA for hitting, BF for pitching).
+    Splits without a team key are season totals and are dropped."""
+    js = _get(f"/people/{int(mlbam_id)}/stats",
+              {"stats": "season", "group": group, "season": season, "sportId": 1}, season)
+    stats = js.get("stats") or []
+    field = "plateAppearances" if group == "hitting" else "battersFaced"
+    rows = []
+    for sp in (stats[0].get("splits", []) if stats else []):
+        team = sp.get("team")
+        if team:
+            rows.append({"season": season, "mlbam_id": int(mlbam_id), "team_id": team["id"],
+                         "pa": int(sp["stat"].get(field, 0) or 0)})
+    return pd.DataFrame(rows, columns=["season", "mlbam_id", "team_id", "pa"])
 
 
 def team_totals(season: int, group: str) -> pd.DataFrame:
