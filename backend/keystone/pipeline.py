@@ -1,6 +1,6 @@
-"""KEYSTONE CLI. Subcommands: fetch, build (P1) · backtest, holdout (P2) · project (P3).
+"""KEYSTONE CLI. Subcommands: fetch, build (P1) · backtest, holdout (P2) · project (P3) · statcast (P6).
 
-Later phases add: statcast | diagnostics.
+Later phases add: diagnostics.
 """
 from __future__ import annotations
 
@@ -66,7 +66,19 @@ def cmd_project(args: argparse.Namespace) -> None:
 
     C.ensure_dirs()
     proj.run(window_end=args.window_end, horizons=args.horizons, quick=args.quick,
-             out=args.out, seed=args.seed)
+             out=args.out, seed=args.seed, tier=args.tier)
+
+
+def cmd_statcast(args: argparse.Namespace) -> None:
+    """Populate the raw Savant cache and write processed statcast_{H,P}.parquet (MANUAL §4.1, §5.4)."""
+    from keystone.data import statcast as sc
+
+    C.ensure_dirs()
+    seasons = _seasons(args.start, args.end)
+    print(f"[statcast] seasons {seasons[0]}..{seasons[-1]}  cache: {sc.RAW}")
+    sc.fetch_seasons(seasons)
+    sc.build_processed(seasons)
+    print("[statcast] done")
 
 
 def cmd_holdout(args: argparse.Namespace) -> None:
@@ -118,11 +130,18 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("project", help="write production artifacts to data/artifacts/ (§7)")
     p.add_argument("--window-end", type=int, default=C.SEASON_END)
     p.add_argument("--horizons", type=int, default=4)
+    p.add_argument("--tier", type=int, default=None, choices=(2, 3),
+                   help="override the tier fits; default follows backtest.json production_tier")
     p.add_argument("--quick", action="store_true",
                    help="smoke test: hitters, 200 players, 2 stages, 150 draws")
     p.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
     p.add_argument("--seed", type=int, default=1)
     p.set_defaults(func=cmd_project)
+
+    sc = sub.add_parser("statcast", help="fetch Savant leaderboards and write statcast_{H,P}.parquet")
+    sc.add_argument("--start", type=int, default=C.SEASON_START)
+    sc.add_argument("--end", type=int, default=C.SEASON_END)
+    sc.set_defaults(func=cmd_statcast)
 
     h = sub.add_parser("holdout", help="score the held-out season once (§6)")
     h.add_argument("--target", type=int, default=C.HOLDOUT_TARGET)

@@ -32,6 +32,7 @@ from keystone.components import (PARK_STAGES, HITTER_STAGES, PITCHER_STAGES, der
                                  derive_pitcher, pa_prime, per_pa_from_stage_rates,
                                  simulate_season, stage_counts)
 from keystone.data import mlb_api
+from keystone.data import statcast as SC
 from keystone.models import marcel as MARCEL
 from keystone.models import state_space as SS
 
@@ -336,6 +337,22 @@ def interval_coverage(P: dict, ids: np.ndarray, actual: pd.DataFrame, role: str,
 
 # ---------------------------------------------------------------- one target
 
+def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
+    """{stage: DataFrame(mlbam_id, season, ind_y, ind_n)} for the Tier 3 stages in §5.4.
+
+    Stages without a Tier 3 indicator (or with no Savant data on disk) are omitted; the fitter
+    then falls back to Tier 2 behaviour for that stage. Anything at or after the target season is
+    stripped here so no scoring data can leak into the indicator likelihood.
+    """
+    out: dict = {}
+    for stage in stages:
+        ind = SC.load_indicator(role, stage)
+        if ind is None or ind.empty:
+            continue
+        out[stage] = ind[ind.season < target].reset_index(drop=True)
+    return out
+
+
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
                sampling: dict, seed: int = 1) -> list[dict]:
     train = train_slice(b, target)
@@ -375,7 +392,12 @@ def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
     score("league", league_probs(train, role, target, ids))
 
     tier_name = f"tier{tier}"
-    ss_ids, P, diags = tier_draws(train, role, target, stages, sampling, seed=seed)
+    indicators = tier3_indicators(role, stages, target) if tier == 3 else None
+    if tier == 3 and not indicators:
+        print(f"  [warn] tier 3 requested for {role} but no Statcast indicator on disk for any of "
+              f"{stages} — running Tier 2 fits (labelled tier3)")
+    ss_ids, P, diags = tier_draws(train, role, target, stages, sampling,
+                                  indicators=indicators, seed=seed)
 
     if set(stages) == set(ROLE_STAGES[role]):
         score(tier_name, pd.DataFrame({st: P[st].mean(axis=1) for st in P}, index=ss_ids),

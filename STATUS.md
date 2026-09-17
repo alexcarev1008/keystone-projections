@@ -7,7 +7,7 @@
 - [x] P3 Production artifacts
 - [ ] P4 API
 - [ ] P5 Frontend (+ screenshots in docs/screenshots/)
-- [ ] P6 Statcast data + Tier 3 plumbing
+- [x] P6 Statcast data + Tier 3 plumbing
 - [ ] P6.5 Fable context pack (`make diagnostics`)
 
 ## Stage B — Fable missions (FABLE_MISSIONS.md)
@@ -26,11 +26,18 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- P3 make project: done. All 7 artifacts live at `data/artifacts/`.
-- Nothing to run right now.
-- Next Opus session: pick P4 (API) or P6+P6.5 (Statcast + Fable context pack).
-  P4 unblocks the frontend (P5); P6.5 unblocks Fable M1/M2a. Either is fine now that P3
-  is on disk.
+- P6 Statcast: `make statcast` (long, first fetch of the Savant leaderboards 2015–2026;
+  pybaseball hits savant, agent doesn't). Writes `data/raw/statcast/{H,P}_{year}.parquet`
+  + `data/processed/statcast_{H,P}.parquet` (mlbam_id, season, attempts, barrels, ev95plus).
+- P6 Tier 3 backtest: `make backtest TIER=3`. Fits the 3 §5.4 stages (H/hr, H/hit_bip, P/hr)
+  with the Statcast indicator likelihood at target_accept 0.95; all other stages stay Tier 2.
+  Merges new rows into `data/artifacts/backtest.json` without erasing the Tier 2 rows;
+  `production_tier` recomputes for both roles from the combined table.
+- Next Opus session: P4 (API) OR P6.5 (Fable context pack). P6.5 kickoff prompt must remind
+  the agent that CONTEXT.md leads with the three open findings from Phase 2 + the M1 note:
+  (1) hitter HR% (Tier 2 .0155 vs Marcel .0124, cov80 .71),
+  (2) H/hit_bip divergence concentration (181 of 313),
+  (3) park-neutral scoring question in the M1 notes below.
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
@@ -115,6 +122,25 @@ into `data/artifacts/_quick/` so a real `make project` is never overwritten.
   k_pct, bb_pct, hr_pct, babip, k_minus_bb, fip, era for P).
 - 11 tests still pass.
 
+### P6 Statcast + Tier 3 plumbing — agent (2026-09-17, code only)
+- `data/statcast.py`: `fetch_seasons` (pybaseball `statcast_{batter,pitcher}_exitvelo_barrels`,
+  `minBBE=1`), caches to `data/raw/statcast/{role}_{year}.parquet`; `build_processed` writes
+  `statcast_{H,P}.parquet` with columns (mlbam_id, season, attempts, barrels, ev95plus).
+  `load_indicator(role, stage)` maps the three §5.4 stages via `INDICATOR_MAP` and returns
+  (mlbam_id, season, ind_y, ind_n) with `ind_n > 0`; other stages return `None`, so the fitter
+  falls back to Tier 2 for them automatically.
+- `pipeline.py statcast --start --end` wired; Makefile target `make statcast` already existed.
+- `backtest.tier3_indicators(role, stages, target)` strips seasons ≥ target from every indicator
+  (no leakage into the Statcast likelihood) and hands them to `tier_draws`.
+- `project.py`: `fit_and_project_stage` now accepts an indicator; `--tier 3` overrides
+  `production_tier` to tier3 for all roles and feeds indicators to the three mapped stages.
+- Model plumbing already in place (verified reference): `state_space.build_model(...,
+  use_indicator=True)` adds a_ind/b_ind/nu + a second Binomial, fit at target_accept 0.95.
+- Tests: 4 new in `test_statcast_tier3.py` (indicator column map, drop rows with zero denom,
+  target-season strip, model wires `a_ind`/`b_ind`/`ind` when use_indicator=True).
+  Full suite: **15 passed** in ~14 s.
+- No Statcast download run; no Tier 3 backtest run. Both are Daniel jobs listed above.
+
 ### P3 full `make project` (Daniel, 2026-09-17, ~35 min, 4 chains × 500 draws over 12 fits)
 - 2,936 players projected × 4 horizons × 9 stats (H) / 7 stats (P) = 92,324 rows.
 - Schema check passes for all 6 parquet files + meta.json.
@@ -171,6 +197,9 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P3: `history.parquet` includes raw stage counts (`k_y`, `k_n`, ...) alongside derived rates. Small extra bytes; makes the API and Methodology tables reconstruct-from-source without re-reading `player_season_{H,P}`.
 - 2026-09-17 — P3: FIP in projections and history is rebased on each player's Marcel PT (h=1) or actual IP (history) to match the P2 convention (§6 requires it for simulations).
 - 2026-09-17 — P3 result: the ">95% of players see wider h=4 bands than h=1" spot check hits 42.5% (H wOBA) / 60.1% (P FIP). This is what the fitted model actually says — several stages have tau ≈ 0.02, so `h·tau²` growth is dwarfed by initial state variance for young/lightly-observed players. Recorded honestly; the Methodology page should show band widths per stage rather than claim uniform widening.
+- 2026-09-17 — P6: Tier 3 obs frame is Tier 2's obs left-joined to `data/processed/statcast_{role}.parquet` mapped via `INDICATOR_MAP` (H/hr: barrels/attempts; H/hit_bip: ev95plus/attempts; P/hr: barrels/attempts). Stages not in the map fit as Tier 2 within the same tier=3 run — the manual only names those three, and `state_space.build_model` already uses the indicator only when told to.
+- 2026-09-17 — P6: leakage guard for Tier 3 is `backtest.tier3_indicators(...).season < target`. Same construction as Tier 2's `train_slice`: filter before building anything the model can see.
+- 2026-09-17 — P6: `project --tier 3` sets `production_tier` to tier3 for every role and rewrites `data/artifacts/` accordingly. When the flag is absent, `project.py` still follows `backtest.json.production_tier`, so a run after Fable's Tier 3 backtest picks up the new gate automatically.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

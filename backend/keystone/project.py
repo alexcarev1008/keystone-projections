@@ -27,6 +27,7 @@ from keystone import league as LG
 from keystone.components import (HITTER_STAGES, PARK_STAGES, PITCHER_STAGES,
                                  derive_hitter, derive_pitcher, pa_prime,
                                  per_pa_from_stage_rates, stage_counts)
+from keystone.data import statcast as SC
 from keystone.eval.backtest import Bundle, load_bundle
 from keystone.models import marcel as MARCEL
 from keystone.models import state_space as SS
@@ -159,9 +160,13 @@ class StageFit:
 
 
 def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, horizons: int,
-                           sampling: dict, seed: int, cap: int | None) -> StageFit:
+                           sampling: dict, seed: int, cap: int | None,
+                           indicator: pd.DataFrame | None = None) -> StageFit:
     window = (window_end - C.WINDOW_LEN + 1, window_end)
     obs = _stage_obs(b, role, stage, window)
+    if indicator is not None:
+        ind = indicator[indicator.season.between(*window)]
+        obs = obs.merge(ind, on=["mlbam_id", "season"], how="left")
     exp = None
     if stage in PARK_STAGES:
         exp = b.exp[role]
@@ -170,8 +175,8 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
         obs, exp = _cap_players_to_top(obs, exp, window_end, cap)
 
     d = SS.build_stage_data(obs, window_end, exp)
-    model = SS.build_model(d, use_park=(stage in PARK_STAGES))
-    idata = SS.fit(model, seed=seed, target_accept=0.9, **sampling)
+    model = SS.build_model(d, use_park=(stage in PARK_STAGES), use_indicator=indicator is not None)
+    idata = SS.fit(model, seed=seed, target_accept=0.95 if indicator is not None else 0.9, **sampling)
     diag = _diagnostics(idata)
     mu_proj = LG.projection_logit(b.lg[role], stage, window_end)
 
@@ -719,7 +724,7 @@ def projection_population(b: Bundle, role: str, window_end: int) -> np.ndarray:
 # ---------------------------------------------------------------- entry
 
 def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
-        out: Path | None = None, seed: int = 1) -> None:
+        out: Path | None = None, seed: int = 1, tier: int | None = None) -> None:
     if out is None:
         # --quick smoke tests write to a sibling dir so they never overwrite production artifacts.
         out = C.ARTIFACTS / "_quick" if quick else C.ARTIFACTS
@@ -742,14 +747,20 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
     prod_tier = {"H": "tier2", "P": "tier2"}
     if bt_path.exists():
         prod_tier = json.loads(bt_path.read_text()).get("production_tier", prod_tier)
+    if tier == 3:
+        prod_tier = {r: "tier3" for r in roles}
+    fit_tier = tier or (3 if any(v == "tier3" for v in prod_tier.values()) else 2)
     print(f"[project] window_end={window_end} horizons={horizons} quick={quick} "
-          f"sampling={sampling} production_tier={prod_tier}")
+          f"sampling={sampling} production_tier={prod_tier} fit_tier={fit_tier}")
 
     fits: dict = {}
     for role in roles:
         for stage in stage_map[role]:
+            ind = SC.load_indicator(role, stage) if fit_tier == 3 else None
+            if fit_tier == 3 and ind is not None:
+                ind = ind[ind.season <= window_end].reset_index(drop=True)
             fits[(role, stage)] = fit_and_project_stage(
-                b, role, stage, window_end, horizons, sampling, seed, cap)
+                b, role, stage, window_end, horizons, sampling, seed, cap, indicator=ind)
 
     marcel_rates = {role: _marcel_stage_rates(b, role, window_end + 1) for role in roles}
     marcel_pt = {role: _marcel_pt(b, role, window_end + 1) for role in roles}
