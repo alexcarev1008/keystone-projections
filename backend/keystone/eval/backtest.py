@@ -215,15 +215,23 @@ def _stage_long(train: Bundle, role: str, window: tuple[int, int]) -> pd.DataFra
     return long
 
 
+RHAT_WARN = 1.05
+
+
 def _diagnostics(idata) -> dict:
+    """Sampler health on the population parameters. r_hat needs >= 2 chains; it is None below that."""
     names = [v for v in ("tau", "sigma_pop", "lam", "sigma_age", "g0", "park_sd")
              if v in idata.posterior]
-    r = az.rhat(idata, var_names=names)
-    max_rhat = max(float(np.nanmax(np.asarray(r[v]))) for v in names)
+    max_rhat = None
+    if idata.posterior.sizes.get("chain", 1) > 1:
+        r = az.rhat(idata, var_names=names)
+        vals = [float(np.nanmax(np.asarray(r[v]))) for v in names
+                if np.isfinite(np.asarray(r[v])).any()]
+        max_rhat = round(max(vals), 4) if vals else None
     div = 0
     if "diverging" in idata.sample_stats:
         div = int(np.asarray(idata.sample_stats["diverging"]).sum())
-    return {"max_rhat": round(max_rhat, 4), "divergences": div}
+    return {"max_rhat": max_rhat, "divergences": div}
 
 
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
@@ -275,8 +283,10 @@ def tier_draws(train: Bundle, role: str, target: int, stages: list[str], samplin
         raw[stage] = (ids, draws)
         diags[stage] = diag
         ids_common = pd.Index(ids) if ids_common is None else ids_common.intersection(ids)
-        print(f"  fit {role}/{stage}: {len(ids)} players, max r_hat {diag['max_rhat']}, "
-              f"divergences {diag['divergences']}")
+        rh = diag["max_rhat"]
+        flag = "  <-- CHECK" if rh is not None and rh > RHAT_WARN else ""
+        print(f"  fit {role}/{stage}: {len(ids)} players, max r_hat {rh}, "
+              f"divergences {diag['divergences']}{flag}")
     ids_common = ids_common.to_numpy()
     out = {}
     for stage, (ids, draws) in raw.items():
