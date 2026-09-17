@@ -26,9 +26,9 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- `make data`   # fetch 2015–2026 + build all processed parquet (≈ 5–10 min, ~900 requests + a few hundred per-player splits per season)
-- Paste the last ~20 lines of build output into "Results" below (per-season PA diff, modelled counts).
-- Then Opus session for P2 (backtest harness).
+- P1 make data: done.
+- Next: kick off an Opus session for **P2** (backtest harness) — read `MANUAL.md` §5.2, §5.3, §6.
+- After Opus writes P2, Daniel runs `make backtest-quick` (< 5 min) as a smoke test, then `make backtest` (long).
 
 ## Results (paste summaries here, ≤ 30 lines each)
 
@@ -38,6 +38,13 @@
 - modelled H 2024: 649 (≥ 600 OK), modelled P 2024: 802 (≥ 600 OK)
 - 10 processed parquet files written under `data/processed/`
 - pytest: 7/7 pass
+
+### P1 full make data (Daniel-run, 2015–2026)
+- Fetch: 4,270 unique bios, ~2,200 traded-player split calls per group over 12 seasons.
+- PA sanity: 0.0000% diff for every full season; 2026 diff 0.0006% (partial season, off by 1 PA).
+- Modelled H per season: 573–685 (all pass; 2020 exception cleared at ≥ 400).
+- Modelled P per season: 709–850 (all pass).
+- 10 parquet tables written to `data/processed/`.
 
 ## Gates / production tier
 - Hitters: TBD · Pitchers: TBD
