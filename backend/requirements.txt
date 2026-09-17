@@ -1,0 +1,11 @@
+# Python 3.11-3.13 required (PyMC 5.28 needs >=3.11). Verified resolvable 2026-09-17.
+pymc==5.28.5
+nutpie==0.16.8
+arviz>=0.23.4,<1
+pandas>=2.2,<3
+pyarrow>=17
+requests>=2.32
+fastapi==0.141.1
+uvicorn[standard]>=0.30
+pybaseball==2.2.7
+pytest>=8

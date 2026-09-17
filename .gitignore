@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+frontend/dist/
+data/raw/
+data/processed/
+data/artifacts/*
+!data/artifacts/meta.json
+!data/artifacts/backtest.json
+.DS_Store
