@@ -5,7 +5,7 @@
 - [x] P1 Data layer
 - [x] P2 Backtest harness (Tier 1 + 2)
 - [x] P3 Production artifacts
-- [ ] P4 API
+- [x] P4 API
 - [ ] P5 Frontend (+ screenshots in docs/screenshots/)
 - [x] P6 Statcast data + Tier 3 plumbing
 - [ ] P6.5 Fable context pack (`make diagnostics`)
@@ -26,15 +26,18 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- P6 Statcast: `make statcast` (long, first fetch of the Savant leaderboards 2015–2026;
-  pybaseball hits savant, agent doesn't). Writes `data/raw/statcast/{H,P}_{year}.parquet`
-  + `data/processed/statcast_{H,P}.parquet` (mlbam_id, season, attempts, barrels, ev95plus).
-- P6 Tier 3 backtest: `make backtest TIER=3`. Fits the 3 §5.4 stages (H/hr, H/hit_bip, P/hr)
-  with the Statcast indicator likelihood at target_accept 0.95; all other stages stay Tier 2.
-  Merges new rows into `data/artifacts/backtest.json` without erasing the Tier 2 rows;
-  `production_tier` recomputes for both roles from the combined table.
-- Next Opus session: P4 (API) OR P6.5 (Fable context pack). P6.5 kickoff prompt must remind
-  the agent that CONTEXT.md leads with the three open findings from Phase 2 + the M1 note:
+- Next Opus session: **P5 (Frontend)** — Vite + React + Recharts against the live API. Also
+  outstanding: P6.5 (Fable context pack). No long jobs to run before either.
+- Backlog long jobs (any order, when convenient):
+  - `make statcast` (long, first fetch of the Savant leaderboards 2015–2026;
+    pybaseball hits savant, agent doesn't). Writes `data/raw/statcast/{H,P}_{year}.parquet`
+    + `data/processed/statcast_{H,P}.parquet` (mlbam_id, season, attempts, barrels, ev95plus).
+  - `make backtest TIER=3`. Fits the 3 §5.4 stages (H/hr, H/hit_bip, P/hr)
+    with the Statcast indicator likelihood at target_accept 0.95; all other stages stay Tier 2.
+    Merges new rows into `data/artifacts/backtest.json` without erasing the Tier 2 rows;
+    `production_tier` recomputes for both roles from the combined table.
+- P6.5 kickoff prompt must remind the agent that CONTEXT.md leads with the three open
+  findings from Phase 2 + the M1 note:
   (1) hitter HR% (Tier 2 .0155 vs Marcel .0124, cov80 .71),
   (2) H/hit_bip divergence concentration (181 of 313),
   (3) park-neutral scoring question in the M1 notes below.
@@ -141,6 +144,32 @@ into `data/artifacts/_quick/` so a real `make project` is never overwritten.
   Full suite: **15 passed** in ~14 s.
 - No Statcast download run; no Tier 3 backtest run. Both are Daniel jobs listed above.
 
+### P4 API — agent (2026-09-17, code only)
+FastAPI in `backend/keystone/api/main.py` loads all 6 parquet files + meta.json + backtest.json
+at startup into an in-memory `State`; no model code imported. `create_app(artifacts_dir)` is a
+factory so tests point at fixture dirs. CORS allows `http://localhost:5173` only.
+
+- `/api/health` → `{"status":"ok"}`.
+- `/api/meta` → `{"meta": <meta.json>, "backtest": <backtest.json>}`.
+- `/api/search?q=&limit=` → case- and accent-insensitive substring match (`unicodedata.NFKD`
+  with combining marks stripped); empty q returns `[]`.
+- `/api/leaderboard?role={H,P}&sort=&order=&min_pt=&limit=`. Defaults per §8: H sort=woba desc
+  min_pt=300; P sort=fip asc min_pt=50. Key stats are `[woba, k_pct, bb_pct, hr_pct, babip]`
+  for H / `[fip, k_pct, bb_pct, hr_pct, babip]` for P — each returns `{q10, q50, q90}` at h=1.
+- `/api/players/{id}?role=` → `{bio, role, history, projections:{stat:[…]}, pt, waterfall,
+  aging:{stat:[…]}, league:{stat:value}}`. Default role = "H" if the player has one, else "P".
+  404 when the id is unknown OR when the requested role doesn't apply to that player.
+
+Tests: `tests/test_api.py` (14 tests) builds a small fixture set (a hitter, a pitcher, a
+two-way, and a projection-less player). It covers every endpoint, both leaderboard sort
+directions, min_pt filter, empty-query search, accent folding, two-way role toggle, and 404
+paths. Full suite: **29 passed** in ~17 s. Live smoke against `data/artifacts/`: `curl
+/api/players/665742?role=H` returns the full shape; `/api/leaderboard?role=P` returns
+`[Mason Miller, Cade Smith, Skubal]` (fip q50 2.59/2.82/2.86). Uvicorn came up on the first
+try, no import warnings.
+
+`httpx2>=2.13` added to `requirements.txt` — Starlette's TestClient needs it on Python 3.14.
+
 ### P3 full `make project` (Daniel, 2026-09-17, ~35 min, 4 chains × 500 draws over 12 fits)
 - 2,936 players projected × 4 horizons × 9 stats (H) / 7 stats (P) = 92,324 rows.
 - Schema check passes for all 6 parquet files + meta.json.
@@ -200,6 +229,9 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6: Tier 3 obs frame is Tier 2's obs left-joined to `data/processed/statcast_{role}.parquet` mapped via `INDICATOR_MAP` (H/hr: barrels/attempts; H/hit_bip: ev95plus/attempts; P/hr: barrels/attempts). Stages not in the map fit as Tier 2 within the same tier=3 run — the manual only names those three, and `state_space.build_model` already uses the indicator only when told to.
 - 2026-09-17 — P6: leakage guard for Tier 3 is `backtest.tier3_indicators(...).season < target`. Same construction as Tier 2's `train_slice`: filter before building anything the model can see.
 - 2026-09-17 — P6: `project --tier 3` sets `production_tier` to tier3 for every role and rewrites `data/artifacts/` accordingly. When the flag is absent, `project.py` still follows `backtest.json.production_tier`, so a run after Fable's Tier 3 backtest picks up the new gate automatically.
+- 2026-09-17 — P4: `create_app(artifacts_dir)` factory + module-level `app = create_app()` so both `uvicorn keystone.api.main:app` (real artifacts) and the test suite (fixture dirs) work without env vars or globals.
+- 2026-09-17 — P4: `/api/leaderboard` key stats are `[woba, k_pct, bb_pct, hr_pct, babip]` (H) / `[fip, k_pct, bb_pct, hr_pct, babip]` (P) — the §9 Player-page summary cards. §8 says "each key stat"; making them the same set the summary cards use keeps Home consistent with the Player page.
+- 2026-09-17 — P4: `httpx2>=2.13` added to requirements. Starlette 0.51's TestClient requires it on Python 3.14 (imports fail without). Not a runtime dep of the API itself; only needed to run `tests/test_api.py`.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst
