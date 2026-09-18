@@ -61,15 +61,15 @@ make web            # Vite dev server on :5173
 
 ## Screenshots
 
-Taken 2026-09-17, before the M2 lock and the M3 playing-time wiring, so the PT card still reads "Marcel PT".
+Retaken 2026-09-18 on the shipped build (locked M2 config, M3 playing-time outlook, four-step waterfall).
 
 | | |
 |---|---|
-| Home / search | ![Home](docs/screenshots/Screenshot%202026-09-17%20at%209.37.49%20PM.png) |
-| Pitcher (Aaron Nola) | ![Pitcher](docs/screenshots/Screenshot%202026-09-17%20at%209.38.33%20PM.png) |
-| Two-way (Shohei Ohtani) | ![Ohtani](docs/screenshots/Screenshot%202026-09-17%20at%209.38.56%20PM.png) |
-| Methodology | ![Methodology](docs/screenshots/Screenshot%202026-09-17%20at%209.39.30%20PM.png) |
-| Reliever (Gregory Soto) | ![Soto](docs/screenshots/Screenshot_1.png) |
+| Home / search — the landing page with player search | ![Home / search](docs/screenshots/Home.png) |
+| Aaron Judge — hitter card: wOBA fan chart, component waterfall, multi-year outlook with the MLB-regular chip | ![Aaron Judge, hitter example](docs/screenshots/Judge.png) |
+| Tarik Skubal — the pitcher example: FIP projection with K/BB/HR components and IP-based expected production | ![Tarik Skubal, starting pitcher example](docs/screenshots/Skubal.png) |
+| Shohei Ohtani — the two-way case: hitter and pitcher projections on one card | ![Shohei Ohtani, two-way case](docs/screenshots/Ohtani.png) |
+| Methodology — model equations, fitted stage parameters, validation tables | ![Methodology page](docs/screenshots/Methodology.png) |
 
 ## Limitations
 
