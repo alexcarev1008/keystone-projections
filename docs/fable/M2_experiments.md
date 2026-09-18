@@ -354,8 +354,37 @@ Reasoning, written before the re-run:
   STATUS.md before any 2025 number: H wOBA close to or better than Marcel, P FIP worse than
   Marcel, cov80 in [.75, .85] for both.
 
-### Attempt 2 (locked config `--obs-noise --env-mode shock`) — pending
+### Attempt 2, 2026-09-18 — the holdout, locked config `--obs-noise --env-mode shock`. SPENT.
 
-Runs after the state repair (HANDOFF): restore canonical `backtest.json` + sidecars from the
-clean E5E6 copies in `m2/`, archive the misfire file. Then `make holdout`, once. Result to be
-recorded here exactly as printed.
+Flags header verified at launch (`env_mode: shock, obs_noise: True`); guard passed without
+`--force` on the repaired canonical file. As printed (2025, n = 319 H / 325 P, cov80 in
+brackets):
+
+    H  woba   marcel .0305 | tier2 .0309 (.83)    P  fip    marcel .7317 | tier2 .7399 (.75)
+    H  k      .0364 | .0374 (.76)                 P  k      .0380 | .0375 (.83)
+    H  bb     .0197 | .0195 (.82)                 P  bb     .0172 | .0182 (.84)
+    H  hr     .0117 | .0118 (.81)                 P  hr     .0100 | .0098 (.81)
+    H  babip  .0327 | .0302 (.81)                 P  babip  .0336 | .0319 (.78)
+    gates (dev targets, unchanged by design): H FAIL 2/4 cov80 .82 · P FAIL 1/4 cov80 .76
+    production_tier: H=marcel  P=marcel
+
+**Against the pre-registered expectation** (on record before any 2025 number): H wOBA "close to
+or better than Marcel" — close (−.0004), not better; P FIP worse than Marcel — yes (−.0082);
+cov80 in [.75, .85] for both key stats — yes, H .83 and P .75 (at the band's floor). Two of
+three as expected; the H half-win did not materialise.
+
+**Honest reading.** The locked model does not beat Marcel on either key stat in 2025. Marcel
+had its best year of the five scored (wOBA .0305, FIP .7317 — both below every dev-year value),
+and the dev-mean hitter advantage (.0328 vs .0334) did not carry: one year is n = 1 and neither
+confirms nor refutes the mean-vs-gate argument above, which stands as an argument, not a
+result. What did replicate out-of-sample is the component pattern (tier2 wins BABIP both roles,
+P hr, P k, H bb; loses H k and P bb) and — the thing E6 was for — **calibration: cov80 in band
+on both key stats and 9 of 10 rows** (H k .76 the low edge). The shipping decision §6 already
+made is unchanged and is now holdout-validated on its own terms: Marcel points, Tier 2 bands,
+and the bands are honest. Fit health on the 2025 fits: worst r_hat 1.27 (P/hr), 1.23 (H/xbh),
+63 divergences total — the known remaining geometry blemishes, noted for the record.
+
+**Per the pre-commitments:** the old-config misfire scored nearly identically on 2025 key stats
+(H .0309 / P .7402 vs locked .0309 / .7399) — recorded, acted on by no one. The holdout is now
+spent; `holdout_target: 2025` is latched in `backtest.json`. M2 is closed: the locked
+configuration, the dev evidence for it, the misfire, and the 2025 result are all above.

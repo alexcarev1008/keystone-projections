@@ -14,7 +14,7 @@
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
-- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wired the 3 holdout-blocking HANDOFF items 2026-09-18 (item 4, Methodology + meta docs, still open) → holdout attempt 1 misfired (ruled invalid, see below) → Opus repaired state + writer guard 2026-09-18 → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
+- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: HANDOFF item 4 (Methodology/meta docs), `make project`, `make diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -47,14 +47,13 @@
      now refuses a flag mismatch before loading or fitting, and again before writing. The guard
      is covered by regression tests; `make test` passes (49). `make diagnostics` is green; the
      context pack is unchanged apart from its timestamp.
-  2. **Daniel — NEXT:** `make holdout` — the authorised re-run, ONCE, no `--force` needed after the
-     repair. Verify the printed flags header says `env_mode: shock, obs_noise: True` before
-     letting it proceed past the first line. After this run the holdout is spent for good.
-  3. Paste the printed 2025 table back into the M2c Fable session. Pre-registered expectation
-     (on record before any 2025 number): H wOBA close to or better than Marcel, P FIP worse
-     than Marcel, cov80 in [.75,.85] for both.
-  4. `make project` (~35 min) then `make diagnostics` (~10 s) — production artifacts + context
-     pack under the locked config.
+  2. ~~**Daniel:** `make holdout`~~ DONE 2026-09-18 — ran clean (flags header `shock`/
+     `obs_noise: True`, guard passed, no `--force`). **The holdout is SPENT.**
+  3. ~~Paste the printed 2025 table back~~ DONE — recorded in `M2_experiments.md`
+     §"The 2025 holdout" and in Results below.
+  4. **← NEXT (Daniel):** `make project` (~35 min) then `make diagnostics` (~10 s) — production
+     artifacts + context pack under the locked config. Opus: HANDOFF item 4 (Methodology +
+     meta.json docs) is the last open M2c item. Then M3 (or cut per budget) / M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -112,6 +111,20 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### 2025 holdout attempt 2 — SPENT (Daniel, 2026-09-18, locked config, guard passed, no --force)
+Full record + reading: `M2_experiments.md` §"The 2025 holdout". Key rows (marcel | tier2):
+H wOBA .0305 | .0309 (cov80 .83) · P FIP .7317 | .7399 (cov80 .75). Against the pre-registered
+expectation: H "close to or better" — close (−.0004), not better; P worse — yes; cov80 in band
+both — yes (9/10 stat rows in [.75,.85], H k .76 at the floor). Marcel had its best year of the
+five scored; the dev-mean H advantage didn't carry (n=1 — decides nothing about the mean-vs-gate
+argument, which stands as an argument). Component pattern replicated out-of-sample: tier2 wins
+BABIP both roles (H .0302 vs .0327, P .0319 vs .0336), P hr, P k, H bb; loses H k, P bb.
+Calibration — the E6 claim — validated on 2025. Gates unchanged by design: production ships
+Marcel points + Tier 2 bands, and the holdout says the bands are honest. The old-config misfire
+scored ~identically on 2025 key stats (H .0309 / P .7402) — recorded, acted on by no one, per
+the pre-commitments. 2025-fit health: worst r_hat 1.27 (P/hr), 1.23 (H/xbh), 63 divergences —
+the known geometry blemishes. **M2 closed.**
 
 ### 2025 holdout attempt 1 — MISFIRE (Daniel, 2026-09-18 14:53, ruled invalid by Fable M2c)
 Ran the pre-handoff code (raced the wiring commit by 1 min): old config `mean3`/no obs-noise,
@@ -594,6 +607,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-18 — M2c wiring: the locked config (obs-noise + env shock) is the default everywhere (`backtest.py` functions, the `backtest`/`holdout`/`project` CLIs, `project.py`) with opt-outs back to the pre-M2 model; `project` offers only shock/mean3 because recency was rejected.
 - 2026-09-18 — M2c wiring: `holdout` refuses to run unless its flags match `backtest.json.experiment_flags`. The holdout is one-shot, and a mismatch means scoring a model the gates weren't decided on (which the unwired holdout would have done).
 - 2026-09-18 — M2c promotion: the superseded post-M1 baseline backtest (JSON + untracked sidecars, incl. the pre-M2 tier3 rows) is archived under `data/artifacts/m2/backtest_base*` rather than discarded, because the M2 verdicts cite its numbers.
+- 2026-09-18 — M2c holdout spent: attempt 2 ran the locked config clean (guard passed). Recorded as measured: tier2 beats Marcel on neither 2025 key stat (H −.0004, P −.0082) but cov80 is in band on both (.83/.75) — shipping mode (Marcel points + Tier 2 bands) unchanged and now holdout-validated on its calibration claim. No tuning, no re-run, M2 closed.
 - 2026-09-18 — M2c holdout ruling: attempt 1 (14:53) scored the superseded config because the run raced the wiring commit — ruled invalid, holdout NOT spent; one locked-config re-run authorised with pre-commitments recorded (config ships regardless of the now-leaked old-vs-new 2025 comparison; no modelling decision changes on the misfire numbers; spent after the re-run whatever it says).
 - 2026-09-18 — M2c: production configuration locked = tier2 `--obs-noise --env-mode shock` (the `backtest_E5E6.json` run, seed 1) — E5 and E6 passed every pre-registered sub-check; E3 rejected (core sub-check unverifiable + r_hat 1.363 + gain subsumed by E5); `--innov t4` declined (relabelling reappears under obs-noise, no geometry win); correlated stages declined with reasons (weak observed corr, binding losses are regime errors, rebuild cost). Gates still FAIL → Marcel points + Tier 2 bands; holdout runs the locked config after Opus wires the flags.
 - 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.
