@@ -147,8 +147,8 @@
   rises with age (Judge 545/579/620/646 PA at 35–38 while wOBA .419 → .369, checked against
   `projections.parquet`). We don't display numbers we haven't validated.
 - `AgingOutlook.tsx`: h1 rows unchanged; h2–h4 rows keep the rate columns and replace the PT/count
-  cells + "chance he plays" line with "rates only — playing time projected one year ahead". Also
-  removed the "chance still an MLB regular in <h4 season>" chip (h4 `p_regular` is the same
+  cells + "chance he plays" line with "rates only — playing time projected one year ahead". The
+  "chance still an MLB regular" chip now uses h1 `p_regular` and the h1 season (was h4, the same
   unvalidated PT output). Footer notes PT is year-1 only.
 - Methodology "Known artifact" paragraph → "Playing time is shown for year 1 only" + a Limitations
   bullet; memo §5 item 2 and README Limitations restated as a deliberate display decision.

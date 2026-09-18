@@ -40,6 +40,7 @@ export default function AgingOutlook({
   const counts = COUNT_STATS[role]
   const ptBy = new Map(playingTime.map(r => [r.horizon, r]))
   const hasPT = playingTime.some(r => isNum(r.pt_expected))
+  const h1 = ptBy.get(1)
   const rateOf = (stat: string, h: number) => (projections[stat] ?? []).find(r => r.horizon === h)?.mean ?? null
   const nCols = 3 + 1 + counts.length + stats.length
 
@@ -47,6 +48,11 @@ export default function AgingOutlook({
     <div className="aging-grid">
       <div className="card">
         <h3>Outlook (h = 1…4)</h3>
+        {hasPT && h1 && isNum(h1.p_regular) && (
+          <div className="outlook-chip">
+            Chance still an MLB regular in {h1.season} — <strong>{pctInt(h1.p_regular)}</strong>
+          </div>
+        )}
         <div className="table-scroll">
           <table className="outlook-table">
             <thead>
