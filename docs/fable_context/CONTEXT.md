@@ -1,6 +1,6 @@
 # KEYSTONE — Fable context pack
 
-generated: 2026-09-18T01:52:12+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
+generated: 2026-09-18T01:54:43+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
 
 ## 1. What KEYSTONE is (one paragraph)
 

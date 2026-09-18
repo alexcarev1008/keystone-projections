@@ -6,7 +6,8 @@
       "Bash(PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline build --start 2024 --end 2024)",
       "Bash(PYTHONPATH=. ../.venv/bin/python -m pytest tests -q)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(/Users/danielcho/Desktop/keystone-projections/.venv/bin/python *)"
     ]
   }
 }
