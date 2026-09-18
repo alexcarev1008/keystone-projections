@@ -6,7 +6,7 @@
 - [x] P2 Backtest harness (Tier 1 + 2)
 - [x] P3 Production artifacts
 - [x] P4 API
-- [ ] P5 Frontend (+ screenshots in docs/screenshots/)
+- [x] P5 Frontend (agent build; Daniel: `make api` + `make web` + save screenshots)
 - [x] P6 Statcast data + Tier 3 plumbing
 - [ ] P6.5 Fable context pack (`make diagnostics`)
 
@@ -26,21 +26,21 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
-- Next Opus session: **P5 (Frontend)** — Vite + React + Recharts against the live API. Also
-  outstanding: P6.5 (Fable context pack). No long jobs to run before either.
-- Backlog long jobs (any order, when convenient):
-  - `make statcast` (long, first fetch of the Savant leaderboards 2015–2026;
-    pybaseball hits savant, agent doesn't). Writes `data/raw/statcast/{H,P}_{year}.parquet`
-    + `data/processed/statcast_{H,P}.parquet` (mlbam_id, season, attempts, barrels, ev95plus).
-  - `make backtest TIER=3`. Fits the 3 §5.4 stages (H/hr, H/hit_bip, P/hr)
-    with the Statcast indicator likelihood at target_accept 0.95; all other stages stay Tier 2.
-    Merges new rows into `data/artifacts/backtest.json` without erasing the Tier 2 rows;
-    `production_tier` recomputes for both roles from the combined table.
-- P6.5 kickoff prompt must remind the agent that CONTEXT.md leads with the three open
+- **Smoke-test P5** (one terminal per line, no long job):
+  - `make api` — FastAPI on :8000 against `data/artifacts/`.
+  - `make web` — Vite dev server on :5173 (first run does `npm install`).
+  - Manual checks: search "Soto" finds him; a player page renders all 7 sections (header,
+    summary cards, FanChart, ComponentPanel, Waterfall, AgingOutlook, StatTable); the H/P
+    toggle appears for Ohtani (mlbam_id 660271); Methodology shows the backtest table
+    (Marcel / Tier 2 / Tier 3 RMSE, cov80, gates).
+  - Save four screenshots to `docs/screenshots/`: Home, one hitter (e.g. Judge 592450),
+    one pitcher (e.g. Skubal 669373), Ohtani (660271), Methodology.
+- Next Opus session: **P6.5** (Fable context pack). CONTEXT.md leads with the three open
   findings from Phase 2 + the M1 note:
   (1) hitter HR% (Tier 2 .0155 vs Marcel .0124, cov80 .71),
   (2) H/hit_bip divergence concentration (181 of 313),
   (3) park-neutral scoring question in the M1 notes below.
+- Backlog long jobs: none (P6 Statcast + Tier 3 backtest are DONE — see P6 Tier 3 result below).
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
@@ -170,6 +170,71 @@ try, no import warnings.
 
 `httpx2>=2.13` added to `requirements.txt` — Starlette's TestClient needs it on Python 3.14.
 
+### P5 Frontend — agent (2026-09-17, code only, `npm run build` passes)
+Vite 8 + React 19 + react-router-dom 7 + recharts 3, TypeScript strict. Structure per §9:
+- `main.tsx` (BrowserRouter root), `App.tsx` (nav + `/`, `/player/:id`, `/methodology` routes).
+- `api.ts`: typed fetchers for `/api/search|leaderboard|meta|players/:id`; every field the API
+  actually emits is typed. `format.ts`: rate3 (`.312`), pct (`24.1%`), ratio2 (`3.47`), int0;
+  per-stat `fmtStat/fmtRange/statLabel` using the sets in §9. `styles.css`: the design tokens
+  from §9, one file, no CSS framework.
+- `pages/Home.tsx`: title + subtitle (`Projections for {projection_season} · data through
+  {data_through}` from `/api/meta`), Search, Hitters/Pitchers tabs → Leaderboard.
+- `components/Search.tsx`: debounced 250 ms, dropdown of hits, Enter opens the first one,
+  clicking outside closes.
+- `components/Leaderboard.tsx`: sortable header (defaults H sort=woba desc / P sort=fip asc,
+  min_pt 300 PA / 50 IP per §8); each cell shows median with the 80% range beneath in muted.
+- `pages/Player.tsx`: header, summary cards (key stat highlighted in navy), FanChart, then
+  ComponentPanel, Waterfall, AgingOutlook, StatTable. Two-way toggle only when `bio.roles` has
+  both H and P. `role=` in the URL is the source of truth (via `useSearchParams`).
+- `components/FanChart.tsx`: Recharts `ComposedChart`; history dots sized by PA/IP + line;
+  projection band80 + band50 areas + median line; dashed league line via `ReferenceLine`;
+  vertical divider at `window_end + 0.5`. Tooltip lists actual, projected, and both bands.
+- `components/ComponentPanel.tsx`: 2×2 grid of small FanCharts for K%, BB%, HR%, BABIP.
+- `components/Waterfall.tsx`: horizontal bars per step (start/end = accent, deltas colored
+  navy=good / red=bad from the hitter's perspective, inverted for FIP); one sentence per step.
+- `components/AgingOutlook.tsx`: h=1…4 table + typical aging curve with `ReferenceDot`s at
+  the player's ages.
+- `components/StatTable.tsx`: year-by-year history + projection rows italicized on tinted bg.
+- `pages/Methodology.tsx`: Overview, stages, Marcel, state-space (equations as `<pre>`),
+  What learned (per-stage tau/sigma_pop/park_sd from meta + DIPS callout comparing
+  H vs P `hit_bip` sigma_pop + HR park top/bottom), Validation (RMSE + cov80 tables per role,
+  gate results, holdout), Limitations, Data sources.
+- Vite proxies `/api` → `http://127.0.0.1:8000` (§9 requirement). Removed the default
+  `App.css / index.css / assets/`.
+- `npm run build` → 0 TS errors, 609 modules, 671 kB bundle (recharts dominates; single-page
+  app so code-splitting is not worth the complexity here).
+
+### P6 Tier 3 backtest — `make backtest TIER=3` (Daniel, 2026-09-17)
+- Runs 3 mapped stages (H/hr, H/hit_bip, P/hr) with the Statcast indicator likelihood at
+  target_accept 0.95; other stages stay Tier 2 within the same run. Rows merged into
+  `backtest.json` alongside the Tier 2 rows.
+- PA-weighted RMSE, averaged over 2021–2024:
+
+      HITTERS   marcel   tier2    tier3    last  league
+      k_pct     0.0363   0.0350   0.0350  0.0468 0.0593
+      bb_pct    0.0199   0.0204   0.0204  0.0284 0.0282
+      hr_pct    0.0124   0.0155   0.0171  0.0169 0.0157
+      babip     0.0332   0.0318   0.0327  0.0605 0.0353
+      woba      0.0334   0.0364   0.0400  0.0520 0.0371
+
+      PITCHERS  marcel   tier2    tier3    last  league
+      k_pct     0.0400   0.0397   0.0397  0.0518 0.0526
+      bb_pct    0.0206   0.0220   0.0220  0.0344 0.0247
+      hr_pct    0.0109   0.0107   0.0118  0.0191 0.0113
+      babip     0.0334   0.0326   0.0326  0.0613 0.0329
+      fip       0.7947   0.8196   0.8672  1.3123 0.8732
+
+- Gates (rerun with the merged table): **H tier3 FAIL** (0/4 vs tier2, cov80 .77);
+  **P tier3 FAIL** (0/4 vs tier2, cov80 .72). Sampler health improved a lot —
+  H/hit_bip max r_hat 1.04 (was 1.23), total divergences 96 across 48 fits (was 313) —
+  target_accept .95 works, but the point projection on the three mapped stages is worse,
+  not better, on the dev targets. Tier 3 does not ship. `production_tier` stays
+  **H = marcel**, **P = marcel** — the §6 Marcel-points-with-Tier-2-bands fallback still holds.
+  Real finding for Fable M2: Statcast helped calibration and geometry, but Barrel/Attempts
+  as a linear indicator on the same theta apparently drags HR% projections toward the
+  Statcast rate faster than Marcel's raw-count regression does, and hitters' Barrel% is
+  itself noisy over 4 seasons. Something to iterate on, not a tuning failure.
+
 ### P3 full `make project` (Daniel, 2026-09-17, ~35 min, 4 chains × 500 draws over 12 fits)
 - 2,936 players projected × 4 horizons × 9 stats (H) / 7 stats (P) = 92,324 rows.
 - Schema check passes for all 6 parquet files + meta.json.
@@ -232,6 +297,10 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P4: `create_app(artifacts_dir)` factory + module-level `app = create_app()` so both `uvicorn keystone.api.main:app` (real artifacts) and the test suite (fixture dirs) work without env vars or globals.
 - 2026-09-17 — P4: `/api/leaderboard` key stats are `[woba, k_pct, bb_pct, hr_pct, babip]` (H) / `[fip, k_pct, bb_pct, hr_pct, babip]` (P) — the §9 Player-page summary cards. §8 says "each key stat"; making them the same set the summary cards use keeps Home consistent with the Player page.
 - 2026-09-17 — P4: `httpx2>=2.13` added to requirements. Starlette 0.51's TestClient requires it on Python 3.14 (imports fail without). Not a runtime dep of the API itself; only needed to run `tests/test_api.py`.
+- 2026-09-17 — P5: no state library, no CSS framework, no chart library besides recharts (§2). All state in local `useState`; router state via `useSearchParams` for the H/P role toggle so a two-way player's URL is shareable.
+- 2026-09-17 — P5: FanChart draws range areas via Recharts `Area dataKey="band80"` with `[q10, q90]` tuples (Recharts renders two-element arrays as ranges). History dots sized by PA (2.5–6 px radius). Vertical divider at `window_end + 0.5` so it sits between window_end and h=1.
+- 2026-09-17 — P5: Vite proxy `/api → http://127.0.0.1:8000` (§9); CORS on the API is already set to `http://localhost:5173`. No `.env` file — the proxy target is hard-coded because the API always runs on that port locally per the Makefile.
+- 2026-09-17 — P6 Tier 3 gate: FAILS for both roles (0/4 wins vs Tier 2 on the key stat). `production_tier` stays `marcel` for H and P — same Marcel-points-with-Tier-2-bands shipping mode as after Phase 2. Recorded as measured, no tuning; the delta is a Fable M2 research finding, not a bug.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst
