@@ -139,6 +139,105 @@ as such.** Specifics:
 
 - `backend/keystone/models/playing_time.py` — model, prediction, simulation, backtest.
 - `backend/tests/test_playing_time.py` — population/outcome rules, 2020 scaling, leakage
-  guard, hurdle math, simulation rolling, signal recovery (6 tests).
+  guard, hurdle math, simulation rolling, signal recovery, talent sign/shrinkage + talent
+  leakage guard (8 tests).
 - Wiring into artifacts/API/UI: HANDOFF items (Opus).
+
+## 7. Follow-up T1 — talent covariate (pre-registered 2026-09-18, before any run)
+
+Opus's wiring check (STATUS.md "Questions for Fable") found the gap: the hurdle sees only PT
+history and age, so a star coming off a short season is treated like any fading veteran
+(Judge, 285 PA in 2026 after 679: h1 p_play .78, 258 expected PA vs Marcel 410). Teams give
+good players playing time; talent belongs in X. Judge is a symptom, not the target — nothing
+below is tuned on his case.
+
+**Change (flag `talent=True` on `build_pt_table`/`training_table`/`fit_pt`).** One new
+feature per role, from seasons ≤ T−1 only:
+
+- per player-season deviation: H `dev_s = wOBA_s − league wOBA_s` (guts weights + guts league
+  value); P `dev_s = leagueFIPcore_s − FIPcore_s` where FIPcore = (13·HR + 3·(BB+HBP) − 2·K)/IP
+  (cFIP cancels in the difference; league core from the season's aggregate counts). Sign:
+  higher = better for both roles.
+- `talent_raw(T) = (w1·dev1 + w2·dev2) / (w1 + w2 + K)` over seasons T−1, T−2 with w = PA or
+  IP (0 if absent), ballast K = one full season: **K_H = 600 PA, K_P = 180 IP** — fixed, not
+  tuned. 2020 rates enter as-is (rates are season-length-invariant; low PT self-shrinks).
+- scaled to unit-ish range: `talent = talent_raw / 0.05` (H), `/ 0.5` (P). Fixed constants.
+- `simulate_horizons` holds talent fixed across horizons (aging is already carried by agec;
+  decaying talent would be a second new modelling choice, not made here).
+
+**Pre-registered expectations.**
+1. Mechanism: `beta_talent > 0` (play equation) and `gamma_talent > 0` (PT-given-play), each
+   ≥ 2 posterior sd from 0, both roles.
+2. **Gate (same rule style as §2): the covariate ships only if expected-PT RMSE with talent
+   < the shipped hurdle's RMSE in ≥ 3 of 4 dev targets, per role.** Registered risk, stated
+   now: population RMSE is dominated by fringe players whose talent estimate is heavily
+   shrunk, so the RMSE gain may be too small to clear 3/4 even if the mechanism is real. If
+   so, the covariate is rejected under the gate as written — no goalpost move.
+3. Subgroup (reported, not gating): among age ≥ 33 players in the top talent quartile,
+   signed bias moves toward 0 vs the shipped hurdle.
+4. Both variants still beat Marcel 8/8 (sanity).
+
+**Quick validation (pre-registered).** Single H 2024 fit: samples cleanly (divergences ≤ 5),
+beta_talent and gamma_talent both > 0 at ≥ 2 sd.
+
+**Decides.** Fresh dev backtest 2021–2024, both variants, same population/actuals/seed as §3.
+2025 is not touched.
+
+### T1 results (run 2026-09-18, seed 1) — ACCEPT
+
+Every pre-registered check passed; `/tmp/m3_followup_preds.csv` has the per-player table.
+
+| role | target | Marcel | hurdle (§3) | hurdle+talent |
+|---|---:|---:|---:|---:|
+| H | 2021 | 190.5 | 156.8 | **154.1** |
+| H | 2022 | 190.7 | 141.5 | **135.7** |
+| H | 2023 | 205.0 | 144.0 | **138.2** |
+| H | 2024 | 201.9 | 142.7 | **139.1** |
+| P | 2021 | 37.2 | 35.1 | **34.9** |
+| P | 2022 | 41.1 | 35.7 | **34.9** |
+| P | 2023 | 42.1 | 34.7 | **33.6** |
+| P | 2024 | 44.0 | 36.9 | **36.6** |
+
+1. Gate: talent RMSE < shipped hurdle in **8/8** (needed ≥ 3/4 per role) ✓; both variants
+   still beat Marcel 8/8 ✓.
+2. Mechanism: beta_talent +1.06..+1.60 (≥ 4.8 sd from 0), gamma_talent +0.13..+0.40
+   (≥ 5.9 sd), every fit, both roles ✓. 0 divergences in all 16 fits ✓.
+3. Subgroup (age ≥ 33, top talent quartile, pooled roles): signed bias moved toward 0 in
+   4/4 targets — base −29/−33/−24/−31 PA-or-IP → talent −9/−14/−1/−13 (Marcel: −14/+21/+51/+34) ✓.
+
+**Decision: the talent covariate ships.** Production configuration is now the hurdle with
+`talent=True` (guts-based wOBA / FIP-core deviation, K = 600 PA / 180 IP, scale .05 / .5).
+
+**Judge symptom check** (592450, projection 2027, age 35, 285 PA in 2026 after 679 — computed
+after the decision, reported not gating): h1 p_play .78 → **.96**, pt_expected 258 → **545**
+(Marcel 410); p_play at h2–h4 .52/.28/.17 → .95/.94/.94. Direction as the finding demanded —
+teams give good players playing time. One honest artifact: his pt_expected *rises* h1→h4
+(545 → 646) because the simulation replaces the depressed observed s1 (285 PA) with simulated
+healthy seasons while talent stays fixed and aging is only the mild agec quadratic. The h1
+number is dev-validated; h2–h4 remain model-implied extrapolation (§5.2) and now lean
+optimistic for old stars rather than pessimistic. Not patched — noted for the Methodology
+label and re-examined when a season of new data arrives.
+
+## 8. Follow-up finding 2 — regulars ~11% under Marcel: verdict
+
+Opus measured median pt_expected = 0.89× Marcel for 44 hitters with ≥ 600 PA in 2025 and
+≥ 550 in 2026 and asked whether Marcel's +126 PA over-projection means the lower number is
+right. **Verdict: no — for hitter regulars the base hurdle was genuinely biased low, and the
+talent covariate removes most of it.** The per-bucket table from the dev backtest (regulars
+= PT ≥ 600 in T−2 and ≥ 550 in T−1 for H, ≥ 160/≥ 140 IP for P; only 2023–24 targets can
+qualify because 2020 caps T−2):
+
+| role | n | mean actual | Marcel bias | base-hurdle bias | talent bias |
+|---|---:|---:|---:|---:|---:|
+| H | 82 | 589 PA | **+4.0** | −65.1 | −18.1 |
+| P | 53 | 140 IP | +27.5 | −5.6 | **−0.2** |
+
+Marcel's +126 PA over-projection is a *fringe-and-veteran* phenomenon (§1: the 34+/<150-PA
+bucket is +217); for hitter regulars Marcel is nearly unbiased, so it was the right yardstick
+in exactly the bucket Opus checked. The base hurdle sat 11% low there because regulars are
+disproportionately talented and the model had no talent term — same root cause as finding 1,
+one fix for both. Residual −18 PA (~3%): plausibly the partial-2026 features plus remaining
+talent shrinkage; re-check after the season ends as already queued. For pitchers the story
+inverts: Marcel over-projects regular IP (+27) and the hurdle was right all along. The model
+was not changed to match Marcel anywhere — T1 was accepted on its own pre-registered gate.
 

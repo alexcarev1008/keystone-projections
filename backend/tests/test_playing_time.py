@@ -74,6 +74,36 @@ def test_simulate_horizons_rolls_and_decays():
     assert (sim.p_regular <= sim.p_play + 1e-12).all()
 
 
+def _guts():
+    return pd.DataFrame({"season": [2020, 2021, 2022], "wOBA": 0.310, "wOBAScale": 1.24,
+                         "wBB": 0.69, "wHBP": 0.72, "w1B": 0.88, "w2B": 1.25,
+                         "w3B": 1.59, "wHR": 2.05, "cFIP": 3.15})
+
+
+def test_talent_sign_and_shrinkage():
+    base = dict(atBats=500, hits=125, doubles=25, triples=2, homeRuns=15, baseOnBalls=50,
+                intentionalWalks=0, hitByPitch=5, sacFlies=5, strikeOuts=100)
+    star = dict(base, hits=175, homeRuns=40)
+    ps = _ps([dict(mlbam_id=1, season=2021, age=27, plateAppearances=560, **base),
+              dict(mlbam_id=2, season=2021, age=27, plateAppearances=560, **star)])
+    t = PT.build_pt_table(ps, "H", 2022, talent=True, guts=_guts()).set_index("mlbam_id")
+    assert t.loc[2, "talent"] > t.loc[1, "talent"]
+    # ballast shrinks: |scaled talent| < |raw dev| / TALENT_SCALE
+    tt = PT.talent_table(ps, "H", _guts()).set_index("mlbam_id")
+    assert abs(t.loc[2, "talent"]) < abs(tt.loc[2, "dev"]) / PT.TALENT_SCALE["H"]
+
+
+def test_talent_leakage_guard():
+    base = dict(atBats=500, hits=140, doubles=25, triples=2, homeRuns=20, baseOnBalls=50,
+                intentionalWalks=0, hitByPitch=5, sacFlies=5, strikeOuts=100)
+    great = dict(base, hits=200, homeRuns=50)
+    ps = _ps([dict(mlbam_id=1, season=2021, age=27, plateAppearances=560, **base),
+              dict(mlbam_id=1, season=2022, age=28, plateAppearances=560, **great)])
+    with_t = PT.build_pt_table(ps, "H", 2022, talent=True, guts=_guts())
+    without_t = PT.build_pt_table(ps[ps.season < 2022], "H", 2022, talent=True, guts=_guts())
+    pd.testing.assert_series_equal(with_t.talent, without_t.talent)
+
+
 def test_fit_recovers_signal():
     rng = np.random.default_rng(5)
     n = 400

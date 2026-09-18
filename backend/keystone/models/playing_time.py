@@ -18,6 +18,36 @@ SHORT_2020 = 162.0 / 60.0
 FEATURES = {"H": ["const", "s1", "s2", "played1", "played2", "agec", "agec2", "drop"],
             "P": ["const", "s1", "s2", "played1", "played2", "agec", "agec2", "drop", "sp_share"]}
 REGULAR_PT = {"H": 300.0, "P": 100.0}
+TALENT_K = {"H": 600.0, "P": 180.0}
+TALENT_SCALE = {"H": 0.05, "P": 0.5}
+
+
+def talent_table(ps: pd.DataFrame, role: str, guts: pd.DataFrame | None) -> pd.DataFrame:
+    """Per (mlbam_id, season): rate deviation vs league (higher = better) and its PT weight.
+
+    H: wOBA − league wOBA (guts weights + guts league value). P: FIP core difference
+    league − player, core = (13 HR + 3 (BB+HBP) − 2 K) / IP (cFIP cancels).
+    """
+    if role == "H":
+        g = guts.set_index("season")
+        w = g.reindex(ps.season.to_numpy())
+        singles = ps.hits - ps.doubles - ps.triples - ps.homeRuns
+        num = (w.wBB.to_numpy() * (ps.baseOnBalls - ps.intentionalWalks)
+               + w.wHBP.to_numpy() * ps.hitByPitch + w.w1B.to_numpy() * singles
+               + w.w2B.to_numpy() * ps.doubles + w.w3B.to_numpy() * ps.triples
+               + w.wHR.to_numpy() * ps.homeRuns)
+        den = ps.atBats + ps.baseOnBalls - ps.intentionalWalks + ps.sacFlies + ps.hitByPitch
+        dev = np.where(den > 0, num / den.where(den > 0) - w.wOBA.to_numpy(), 0.0)
+        weight = ps.plateAppearances.astype(float).where(den > 0, 0.0)
+    else:
+        ip = ps.outs / 3.0
+        core = 13.0 * ps.homeRuns + 3.0 * (ps.baseOnBalls + ps.hitBatsmen) - 2.0 * ps.strikeOuts
+        agg = ps.assign(core=core, ip=ip).groupby("season")[["core", "ip"]].sum()
+        lg_core = (agg.core / agg.ip).reindex(ps.season.to_numpy()).to_numpy()
+        dev = np.where(ip > 0, lg_core - core / ip.where(ip > 0), 0.0)
+        weight = ip.where(ip > 0, 0.0)
+    return pd.DataFrame({"mlbam_id": ps.mlbam_id.to_numpy(), "season": ps.season.to_numpy(),
+                         "dev": dev, "weight": weight.to_numpy()})
 
 
 def pt_series(ps: pd.DataFrame, role: str) -> pd.DataFrame:
@@ -36,7 +66,8 @@ def _adj(pt: pd.Series, season: int) -> pd.Series:
     return pt * SHORT_2020 if season == 2020 else pt
 
 
-def build_pt_table(ps: pd.DataFrame, role: str, target: int) -> pd.DataFrame:
+def build_pt_table(ps: pd.DataFrame, role: str, target: int,
+                   talent: bool = False, guts: pd.DataFrame | None = None) -> pd.DataFrame:
     """Population = any PT in target-1 or target-2. Features from < target; outcome = PT at target (0 if absent)."""
     t = pt_series(ps, role)
     y1 = t[t.season == target - 1].set_index("mlbam_id")
@@ -56,6 +87,13 @@ def build_pt_table(ps: pd.DataFrame, role: str, target: int) -> pd.DataFrame:
                       "drop": np.maximum(0.0, s2 - s1)}, index=ids)
     if role == "P":
         X["sp_share"] = y1.sp_share.reindex(ids).fillna(0.0)
+    if talent:
+        tt = talent_table(ps[ps.season < target], role, guts)
+        t1 = tt[tt.season == target - 1].set_index("mlbam_id").reindex(ids)
+        t2 = tt[tt.season == target - 2].set_index("mlbam_id").reindex(ids)
+        w1, w2 = t1.weight.fillna(0.0), t2.weight.fillna(0.0)
+        num = w1 * t1.dev.fillna(0.0) + w2 * t2.dev.fillna(0.0)
+        X["talent"] = num / (w1 + w2 + TALENT_K[role]) / TALENT_SCALE[role]
     actual = t[t.season == target].set_index("mlbam_id").pt.reindex(ids).fillna(0.0)
     X["pt_actual"] = actual
     X["played"] = (actual > 0).astype(float)
@@ -63,10 +101,12 @@ def build_pt_table(ps: pd.DataFrame, role: str, target: int) -> pd.DataFrame:
     return X.reset_index().rename(columns={"index": "mlbam_id"})
 
 
-def training_table(ps: pd.DataFrame, role: str, target: int, first_outcome: int = 2017) -> pd.DataFrame:
+def training_table(ps: pd.DataFrame, role: str, target: int, first_outcome: int = 2017,
+                   talent: bool = False, guts: pd.DataFrame | None = None) -> pd.DataFrame:
     """Outcome seasons first_outcome..target-1, skipping 2020. Leakage: only rows with season < target used."""
     ps = ps[ps.season < target]
-    parts = [build_pt_table(ps, role, s) for s in range(first_outcome, target) if s != 2020]
+    parts = [build_pt_table(ps, role, s, talent=talent, guts=guts)
+             for s in range(first_outcome, target) if s != 2020]
     return pd.concat(parts, ignore_index=True)
 
 
@@ -77,11 +117,12 @@ class PTFit:
     gamma: np.ndarray   # (draws, k) conditional coefficients
     sigma: np.ndarray   # (draws,)
     features: list
+    divergences: int = 0
 
 
 def fit_pt(train: pd.DataFrame, role: str, draws: int = 500, tune: int = 500,
            chains: int = 2, seed: int = 1) -> PTFit:
-    feats = FEATURES[role]
+    feats = FEATURES[role] + (["talent"] if "talent" in train.columns else [])
     X = train[feats].to_numpy(dtype=float)
     played = train.played.to_numpy()
     pos = train.pt_actual.to_numpy() > 0
@@ -96,11 +137,12 @@ def fit_pt(train: pd.DataFrame, role: str, draws: int = 500, tune: int = 500,
         idata = pm.sample(draws=draws, tune=tune, chains=chains, cores=chains,
                           nuts_sampler="nutpie", random_seed=seed, progressbar=False)
     post = idata.posterior
+    div = int(idata.sample_stats.diverging.to_numpy().sum()) if "diverging" in idata.sample_stats else 0
     return PTFit(role=role,
                  beta=post.beta.to_numpy().reshape(-1, X.shape[1]),
                  gamma=post.gamma.to_numpy().reshape(-1, X.shape[1]),
                  sigma=post.sigma.to_numpy().reshape(-1),
-                 features=feats)
+                 features=feats, divergences=div)
 
 
 def predict(fit: PTFit, table: pd.DataFrame) -> pd.DataFrame:
@@ -148,15 +190,16 @@ def simulate_horizons(fit: PTFit, table: pd.DataFrame, horizons: int = 4,
     return pd.concat(rows, ignore_index=True)
 
 
-def backtest_pt(ps_by_role: dict, targets: tuple, seed: int = 1) -> pd.DataFrame:
+def backtest_pt(ps_by_role: dict, targets: tuple, seed: int = 1,
+                talent: bool = False, guts: pd.DataFrame | None = None) -> pd.DataFrame:
     """Rolling-origin comparison vs marcel_playing_time. Population and actuals per build_pt_table."""
     from keystone.models.marcel import marcel_playing_time
     out = []
     for role, ps in ps_by_role.items():
         for target in targets:
-            train = training_table(ps, role, target)
+            train = training_table(ps, role, target, talent=talent, guts=guts)
             fit = fit_pt(train, role, seed=seed)
-            ev = build_pt_table(ps[ps.season <= target], role, target)
+            ev = build_pt_table(ps[ps.season <= target], role, target, talent=talent, guts=guts)
             pred = predict(fit, ev).set_index("mlbam_id")
             m_pt = marcel_playing_time(ps[ps.season < target], role, target)
             ids = ev.set_index("mlbam_id").index

@@ -15,6 +15,10 @@
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
 - [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: `make project`, `make diagnostics` (HANDOFF item 4 done)
+- [x] M3 follow-up ($8) — done 2026-09-18: talent covariate ACCEPTED 8/8 vs the shipped hurdle
+  (M3_playing_time.md §7; Judge h1 258 → 545 expected PA); regulars-under-Marcel verdict in §8
+  (real hurdle bias for H regulars, fixed by the same covariate; Marcel was wrong for P regulars)
+  → 1 HANDOFF wiring item (talent=True + guts in project.py/pipeline.py + Methodology copy)
 - [x] M3 Playing time + attrition hurdle model ($20) — done 2026-09-18, see `docs/fable/M3_playing_time.md`: Bayesian hurdle (P(plays) × E[PT|plays]) **beats Marcel PT 8/8 dev targets on the pre-registered RMSE gate** (H −25%, P −11%; bias +42..+127 PA → ±7, +6..+22 IP → ±1.1); multi-year outlook defined as expected production (p_play × conditional) with `p_play`/`pt_expected`/`p_regular` per horizon → 3 HANDOFF items for Opus (artifacts, API/UI, CLI) — wired 2026-09-18 (`handoff: M3`); lands on the next `make project`
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -30,6 +34,7 @@
 | M2b | $20 | Daniel fills in (Fable self-estimate ~$7: input ~220k, output ~18k) | ~$20 |
 | M2c | $15 | Daniel fills in (Fable self-estimate ~$6: input ~200k, output ~12k) | ~$26 |
 | M3 | $20 | Daniel fills in (Fable self-estimate ~$4: input ~110k, output ~12k) | ~$30 |
+| M3 follow-up | $8 | Daniel fills in (Fable self-estimate ~$2: input ~90k, output ~8k) | ~$32 |
 
 ## Next command(s) for Daniel
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
@@ -61,8 +66,10 @@
      serves as the acceptance check for that item. Also open: M2b's sidecar-filename collision.
      ~~Then the three M3 HANDOFF items~~ DONE 2026-09-18 (`handoff: M3`). The same `make project`
      re-run writes `p_play`/`pt_expected`/`p_regular` into projections.parquet, and the player page's
-     outlook picks them up. **Before shipping the outlook, read "Questions for Fable (M3 follow-up)":
-     Judge's page will say a 17% chance he plays in 2030.** Then M4.
+     outlook picks them up. ~~Before shipping the outlook, read "Questions for Fable (M3 follow-up)"~~
+     ANSWERED 2026-09-18: the talent covariate is accepted (M3_playing_time.md §7) and fixes the
+     Judge case (.17 → .94 p_play at 2030). **Opus: wire the new "(M3 follow-up T1)" HANDOFF item
+     before the `make project` re-run**, so the outlook ships with talent in the hurdle. Then M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -691,7 +698,19 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.
 - 2026-09-17 — M2a: three upgrades behind backtest flags, all default-off, pre-registered in `docs/fable/M2_experiments.md` before any run — E2 `--env-mode recency` (recency+size-weighted league forecast + common env shock in projection draws), E3 `--rp-effect` (SP/RP covariate on P stages, T-1 role projected forward), E4 `--innov t4` (Student-t(4) talent innovations, nu fixed, projection noise matched). Full runs write to `data/artifacts/m2/` so `backtest.json` and the gates stay untouched until M2b accepts; production `project.py` wiring is a HANDOFF item gated on M2b.
 
-## Questions for Fable (M3 follow-up) — Opus 2026-09-18, found while wiring; not patched
+## Questions for Fable (M3 follow-up) — Opus 2026-09-18, found while wiring; ANSWERED by Fable 2026-09-18
+
+Both answered in `docs/fable/M3_playing_time.md` §7–§8 (pre-registered, dev targets only, 2025
+untouched). (1) A talent covariate (guts-based wOBA / FIP-core deviation from seasons ≤ T−1,
+ballast 600 PA / 180 IP) was **ACCEPTED 8/8** vs the shipped hurdle (H RMSE 156.8/141.5/144.0/142.7
+→ 154.1/135.7/138.2/139.1; P 35.1/35.7/34.7/36.9 → 34.9/34.9/33.6/36.6); Judge h1 p_play .78 → .96,
+pt_expected 258 → 545. New caveat, recorded not patched: old stars' pt_expected can *rise* with
+horizon (simulated healthy seasons replace the depressed observed PT). Wiring = one open HANDOFF
+item (two one-line call changes + Methodology copy). (2) Verdict: the lower number was **not**
+correct for hitter regulars — Marcel's +126 PA bias lives in fringe/old players; in the regulars
+bucket Marcel is nearly unbiased (+4 PA) and the base hurdle was −65 PA (talent omission, same
+root cause as (1)); talent cuts it to −18. For pitcher regulars the hurdle was right and Marcel
+over-projects (+27 IP). Per-bucket table is in §8. Original questions kept below for the record.
 Measured on real data with the wired `pt_outlook_frame` (projection season 2027, seed 1):
 1. **Stars in their mid-30s after a short season.** Judge (285 PA in 2026 after 679, age 35 in 2027):
    h1 p_play .78, pt_expected 258 (Marcel 410), p_play .52/.28/.17 at h2–h4. The hurdle has no

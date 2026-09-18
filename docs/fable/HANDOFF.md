@@ -143,6 +143,20 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
   default names so `make diagnostics` keeps working.
 
+- [ ] (M3 follow-up T1, Fable-filed 2026-09-18) Switch the PT hurdle to the accepted talent
+  covariate (docs/fable/M3_playing_time.md §7 — ACCEPTED 8/8 vs the shipped hurdle). Two
+  one-line call changes, no model code: (a) `backend/keystone/project.py` `pt_outlook_frame`:
+  pass `talent=True, guts=b.guts` to both `PT.training_table(...)` and `PT.build_pt_table(...)`.
+  (b) `backend/keystone/pipeline.py` `cmd_pt_backtest`: same two kwargs on its
+  `PT.backtest_pt(...)` call (load guts from the bundle it already reads; if it only loads ps,
+  read `data/processed/guts.parquet`). (c) Methodology copy: the playing-time section's Judge-class
+  caveat changes — with talent, a star off a short season projects high again (Judge h1 p_play .96,
+  pt_expected 545), and the known artifact is now *optimism* for old stars at h2–h4 (pt_expected can
+  rise with horizon because simulated healthy seasons replace the depressed observed PT while talent
+  is held fixed); keep the "beyond year 1 is model-implied, not backtested" label — ✔
+  `make pt-backtest` prints RMSE matching §7's talent column on all 8 rows at seed 1 (H 154.1/135.7/
+  138.2/139.1, P 34.9/34.9/33.6/36.6); after the next `make project`, Judge (592450) h1 p_play > .9
+  and pt_expected within ±35% of 545; `make test` green.
 - [x] (M3, Fable-filed 2026-09-18) Wire the playing-time hurdle into artifacts. `backend/keystone/project.py`:
   in `run()`, per role, build `PT.training_table(b.ps[role], role, projection_season)` and
   `PT.fit_pt` (module `keystone.models.playing_time`; seconds per fit, seed from the CLI seed),
