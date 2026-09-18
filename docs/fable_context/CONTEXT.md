@@ -1,6 +1,6 @@
 # KEYSTONE — Fable context pack
 
-generated: 2026-09-18T02:39:51+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
+generated: 2026-09-18T15:09:20+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
 
 ## 1. What KEYSTONE is (one paragraph)
 
@@ -30,10 +30,10 @@ Projections park-neutral, conditional on playing (no attrition model).
 
 | role | tier | wins | of | need | cov80_mean | vs | pass |
 |---|---|---:|---:|---:|---:|---|---|
-| H | tier2 | 0 | 4 | 3 | 0.759 | marcel | FAIL |
-| H | tier3 | 0 | 4 | 3 | 0.773 | tier2 | FAIL |
-| P | tier2 | 1 | 4 | 3 | 0.726 | marcel | FAIL |
-| P | tier3 | 0 | 4 | 3 | 0.718 | tier2 | FAIL |
+| H | tier2 | 2 | 4 | 3 | 0.783 | marcel | FAIL |
+| H | tier3 | 2 | 4 | 3 | 0.8 | tier2 | FAIL |
+| P | tier2 | 1 | 4 | 3 | 0.732 | marcel | FAIL |
+| P | tier3 | 0 | 4 | 3 | 0.723 | tier2 | FAIL |
 
 Gate rule (§6): key stat is wOBA (H) / FIP (P). Tier 2 ships if RMSE <= Marcel in
 3 of 4 dev targets AND mean 80% coverage in [0.75, 0.85]. Tier 3 ships if it clears
@@ -102,12 +102,12 @@ Each CSV is capped at 2,000 rows; this file is capped at 400 lines.
 | file | rows | source | notes |
 |---|---:|---|---|
 | backtest_summary.csv | 200 | data/artifacts/backtest.json | complete |
-| posterior_summaries.csv | 108 | meta.json + backtest diag rows + sidecar (M1) | sidecar missing |
+| posterior_summaries.csv | 108 | meta.json + backtest diag rows + sidecar (M1) | sidecar present |
 | aging_curves.csv | 462 | data/artifacts/aging.parquet | mean only; q10/q90 need per-draw sidecar |
 | park_effects.csv | 16 | meta.json top/bottom_hr_parks | phi_sd null; only top/bottom 3 for hr; other park stages absent |
-| residuals_by_bucket.csv | 1375 | Marcel vs actuals + sidecar Tier 2/3 (M1) | sidecar missing |
-| pit_histograms.csv | 100 | Marcel normal approx + sidecar piecewise Tier 2/3 (M1) | sidecar missing |
-| biggest_misses.csv | 320 | Marcel + sidecar Tier 2/3 key-stat errors (M1) | sidecar missing |
+| residuals_by_bucket.csv | 4125 | Marcel vs actuals + sidecar Tier 2/3 (M1) | sidecar present |
+| pit_histograms.csv | 300 | Marcel normal approx + sidecar piecewise Tier 2/3 (M1) | sidecar present |
+| biggest_misses.csv | 960 | Marcel + sidecar Tier 2/3 key-stat errors (M1) | sidecar present |
 | stage_correlations.csv | 74 | observed residual rates in last window | proxy for talent correlation; not from posteriors |
 | pt_summary.csv | 26 | Marcel PT vs actual for target=2025 | includes share_zero_actual |
 | code_map.md | 1 per file | walk of backend/keystone/ | |
@@ -117,7 +117,7 @@ Each CSV is capped at 2,000 rows; this file is capped at 400 lines.
 `backtest_predictions.parquet` (target, role, tier, mlbam_id, stat, pred_mean, q10, q50,
 q90) and `backtest_posteriors.parquet` (target, role, tier, stage, tau_mean, tau_sd,
 sigma_pop_*, lam_*, sigma_age_*, park_sd_*, ess_bulk_min, max_rhat, divergences) are
-written next to backtest.json on every `make backtest`. Current status: **missing**.
+written next to backtest.json on every `make backtest`. Current status: **present**.
 When present, the sidecar fills the Tier 2/3 columns of the tables above; when absent,
 diagnostics falls back to Marcel-only rows so `make diagnostics` never fails.
 

@@ -50,6 +50,10 @@ PT_BUCKETS_H = ((0, 149, "<150"), (150, 400, "150-400"), (401, 10_000, ">400"))
 PT_BUCKETS_P = PT_BUCKETS_H          # BF' uses the same edges (they were chosen for both)
 HISTORY_BUCKETS = ((1, 1, "1"), (2, 2, "2"), (3, 3, "3+"))
 CAP_ROWS = 2000
+# Per-file caps. residuals_by_bucket legitimately grows with the number of tiers scored
+# (3 tiers x role x stat x target x bucket ~ 4.1k rows); truncating it would silently drop
+# whole tiers, so it gets its own larger cap.
+CAP_OVERRIDES = {"residuals_by_bucket.csv": 6000}
 MAX_CONTEXT_LINES = 400
 
 
@@ -847,7 +851,8 @@ def run(out: Path, artifacts_dir: Path | None = None, processed_dir: Path | None
         "stage_correlations.csv": build_stage_correlations(b, meta.get("window_end") or C.SEASON_END),
         "pt_summary.csv": build_pt_summary(b, meta.get("window_end") or C.SEASON_END),
     }
-    counts = {name.replace(".csv", ""): _write_csv(df, out / name) for name, df in frames.items()}
+    counts = {name.replace(".csv", ""): _write_csv(df, out / name, CAP_OVERRIDES.get(name, CAP_ROWS))
+              for name, df in frames.items()}
 
     (out / "code_map.md").write_text(build_code_map(backend_dir))
     ctx = build_context_md(bt, meta, b, counts, sidecar_state)
@@ -859,5 +864,7 @@ def run(out: Path, artifacts_dir: Path | None = None, processed_dir: Path | None
     if line_count > MAX_CONTEXT_LINES:
         raise AssertionError(f"CONTEXT.md is {line_count} lines (cap {MAX_CONTEXT_LINES})")
     for name, df in frames.items():
-        if len(df) > CAP_ROWS:
-            raise AssertionError(f"{name} has {len(df)} rows (cap {CAP_ROWS})")
+        cap = CAP_OVERRIDES.get(name, CAP_ROWS)
+        if len(df) > cap:      # check what was WRITTEN, not the pre-truncation frame
+            raise AssertionError(f"{name} has {len(df)} rows (cap {cap}) — raise its CAP_OVERRIDE "
+                                 f"or aggregate it, don't let _write_csv truncate silently")
