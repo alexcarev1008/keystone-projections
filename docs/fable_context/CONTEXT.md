@@ -1,6 +1,6 @@
 # KEYSTONE — Fable context pack
 
-generated: 2026-09-18T18:50:51+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
+generated: 2026-09-18T20:19:56+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
 
 ## 1. What KEYSTONE is (one paragraph)
 
@@ -66,32 +66,32 @@ until after M2b — see STATUS.md).
 - **H/hit_bip divergence concentration.** 181 of 313 total dev divergences at
   target_accept 0.9 come from this one stage. The verified simulation had 0
   divergences at the same scale, so it is real-data structure the non-centred
-  parameterisation does not absorb — most likely a funnel where sigma_pop = 0.092 is small next to binomial noise. Tier 3
+  parameterisation does not absorb — most likely a funnel where sigma_pop = 0.091 is small next to binomial noise. Tier 3
   target_accept 0.95 collapsed this to ~4 divergences per fit.
-- **DIPS falls out of the fit.** sigma_pop for hit_bip: H 0.092
-  vs P 0.048 (~ 2x wider talent spread for hitters).
-- **HR park effects, H stage.** park_sd_mean 0.351
+- **DIPS falls out of the fit.** sigma_pop for hit_bip: H 0.091
+  vs P 0.047 (~ 2x wider talent spread for hitters).
+- **HR park effects, H stage.** park_sd_mean 0.358
   (~35% logit swing between top and bottom parks); see park_effects.csv.
-- **Sampling health at production.** max r_hat 1.1106, total
-  divergences 97 across 12 fits (better than dev; still
+- **Sampling health at production.** max r_hat 1.1603, total
+  divergences 89 across 12 fits (better than dev; still
   P/k 1.11 and P/hr 1.10 above the 1.05 line).
 
 ## 6. Population parameters (window_end fits from meta.json)
 
 | role/stage | tau_mean | sigma_pop_mean | park_sd_mean | max_rhat | divergences |
 |---|---:|---:|---:|---:|---:|
-| H/k | 0.1234 | 0.3635 | - | 1.0558 | 5 |
-| H/bb | 0.1349 | 0.3393 | - | 1.0142 | 12 |
-| H/hbp | 0.1398 | 0.5619 | - | 1.0703 | 2 |
-| H/hr | 0.1597 | 0.4781 | 0.3505 | 1.029 | 1 |
-| H/hit_bip | 0.0169 | 0.0924 | 0.0584 | 1.058 | 4 |
-| H/xbh | 0.0224 | 0.1625 | 0.0918 | 1.0446 | 35 |
-| H/triple | 0.0982 | 0.5635 | 0.2567 | 1.0567 | 0 |
-| P/k | 0.1223 | 0.2537 | - | 1.1106 | 5 |
-| P/bb | 0.1030 | 0.2994 | - | 1.0304 | 16 |
-| P/hbp | 0.1177 | 0.4571 | - | 1.0244 | 8 |
-| P/hr | 0.0546 | 0.1751 | 0.1203 | 1.1044 | 4 |
-| P/hit_bip | 0.0257 | 0.0484 | 0.0832 | 1.0315 | 5 |
+| H/k | 0.1043 | 0.3587 | - | 1.1603 | 3 |
+| H/bb | 0.0891 | 0.3349 | - | 1.0186 | 3 |
+| H/hbp | 0.0831 | 0.5613 | - | 1.0801 | 1 |
+| H/hr | 0.0955 | 0.4730 | 0.3577 | 1.059 | 2 |
+| H/hit_bip | 0.0105 | 0.0912 | 0.0583 | 1.0444 | 6 |
+| H/xbh | 0.0198 | 0.1605 | 0.0918 | 1.0418 | 1 |
+| H/triple | 0.0794 | 0.5653 | 0.2500 | 1.1383 | 0 |
+| P/k | 0.0872 | 0.2439 | - | 1.0582 | 1 |
+| P/bb | 0.0623 | 0.2901 | - | 1.0419 | 69 |
+| P/hbp | 0.0846 | 0.4499 | - | 1.1122 | 0 |
+| P/hr | 0.0388 | 0.1706 | 0.1221 | 1.0758 | 0 |
+| P/hit_bip | 0.0235 | 0.0467 | 0.0841 | 1.0375 | 3 |
 
 ## 7. What is in this pack (and what is not)
 
@@ -99,8 +99,8 @@ Each CSV is capped at 2,000 rows; this file is capped at 400 lines.
 
 | file | rows | source | notes |
 |---|---:|---|---|
-| backtest_summary.csv | 160 | data/artifacts/backtest.json | complete |
-| posterior_summaries.csv | 60 | meta.json + backtest diag rows + sidecar (M1) | sidecar present |
+| backtest_summary.csv | 200 | data/artifacts/backtest.json | complete |
+| posterior_summaries.csv | 72 | meta.json + backtest diag rows + sidecar (M1) | sidecar present |
 | aging_curves.csv | 462 | data/artifacts/aging.parquet | mean only; q10/q90 need per-draw sidecar |
 | park_effects.csv | 16 | meta.json top/bottom_hr_parks | phi_sd null; only top/bottom 3 for hr; other park stages absent |
 | residuals_by_bucket.csv | 2750 | Marcel vs actuals + sidecar Tier 2/3 (M1) | sidecar present |

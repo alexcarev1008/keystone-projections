@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-09-17T20:46:07+00:00",
- "data_through": "2026-09-17",
+ "generated_at": "2026-09-18T20:19:41+00:00",
+ "data_through": "2026-09-18",
  "window_end": 2026,
  "projection_season": 2027,
  "horizons": 4,
@@ -10,158 +10,158 @@
  },
  "stages": {
   "H/k": {
-   "tau_mean": 0.12336796009005627,
-   "sigma_pop_mean": 0.363470106478218,
+   "tau_mean": 0.10433152613134868,
+   "sigma_pop_mean": 0.35872868617941617,
    "park_sd_mean": null,
-   "max_rhat": 1.0558,
-   "divergences": 5
+   "max_rhat": 1.1603,
+   "divergences": 3
   },
   "H/bb": {
-   "tau_mean": 0.13491709675747163,
-   "sigma_pop_mean": 0.33926272402539986,
+   "tau_mean": 0.08912721640725081,
+   "sigma_pop_mean": 0.3348734508163265,
    "park_sd_mean": null,
-   "max_rhat": 1.0142,
-   "divergences": 12
+   "max_rhat": 1.0186,
+   "divergences": 3
   },
   "H/hbp": {
-   "tau_mean": 0.13976266504438872,
-   "sigma_pop_mean": 0.5619388586936684,
+   "tau_mean": 0.08308201443197158,
+   "sigma_pop_mean": 0.5613058194011287,
    "park_sd_mean": null,
-   "max_rhat": 1.0703,
-   "divergences": 2
+   "max_rhat": 1.0801,
+   "divergences": 1
   },
   "H/hr": {
-   "tau_mean": 0.15969312385115514,
-   "sigma_pop_mean": 0.47810957825903927,
-   "park_sd_mean": 0.3505200916851049,
-   "max_rhat": 1.029,
-   "divergences": 1,
+   "tau_mean": 0.09549901333771114,
+   "sigma_pop_mean": 0.4730113175799924,
+   "park_sd_mean": 0.35766973108340405,
+   "max_rhat": 1.059,
+   "divergences": 2,
    "top_hr_parks": [
     {
      "venue_id": 3313,
      "venue_name": "Yankee Stadium",
-     "phi": 0.027969314938391106
+     "phi": 0.02085818332390819
     },
     {
      "venue_id": 22,
      "venue_name": "UNIQLO Field at Dodger Stadium",
-     "phi": -0.1351711362927804
+     "phi": -0.13967083444804487
     },
     {
      "venue_id": 2602,
      "venue_name": "Great American Ball Park",
-     "phi": -0.15941093234072226
+     "phi": -0.17611853344392964
     }
    ],
    "bottom_hr_parks": [
     {
      "venue_id": 7,
      "venue_name": "Kauffman Stadium",
-     "phi": -0.7538975972634115
+     "phi": -0.784501882586768
     },
     {
      "venue_id": 3309,
      "venue_name": "Nationals Park",
-     "phi": -0.6267258289211226
+     "phi": -0.6403883461758672
     },
     {
      "venue_id": 2394,
      "venue_name": "Comerica Park",
-     "phi": -0.5612452006699074
+     "phi": -0.5826846741368173
     }
    ]
   },
   "H/hit_bip": {
-   "tau_mean": 0.01692885176512849,
-   "sigma_pop_mean": 0.09242553301026905,
-   "park_sd_mean": 0.05841305324373642,
-   "max_rhat": 1.058,
-   "divergences": 4
+   "tau_mean": 0.010527048172214988,
+   "sigma_pop_mean": 0.09116690036701974,
+   "park_sd_mean": 0.05829460537577859,
+   "max_rhat": 1.0444,
+   "divergences": 6
   },
   "H/xbh": {
-   "tau_mean": 0.022352339587617343,
-   "sigma_pop_mean": 0.16251571586814392,
-   "park_sd_mean": 0.0917606722824061,
-   "max_rhat": 1.0446,
-   "divergences": 35
+   "tau_mean": 0.019822276640650963,
+   "sigma_pop_mean": 0.16046339875126212,
+   "park_sd_mean": 0.09183140216743753,
+   "max_rhat": 1.0418,
+   "divergences": 1
   },
   "H/triple": {
-   "tau_mean": 0.09815018563556546,
-   "sigma_pop_mean": 0.5635005238152466,
-   "park_sd_mean": 0.2567205445081275,
-   "max_rhat": 1.0567,
+   "tau_mean": 0.07936823218241472,
+   "sigma_pop_mean": 0.5653415941803664,
+   "park_sd_mean": 0.2500488389752406,
+   "max_rhat": 1.1383,
    "divergences": 0
   },
   "P/k": {
-   "tau_mean": 0.1222690951287631,
-   "sigma_pop_mean": 0.253698890210307,
+   "tau_mean": 0.08715678401299769,
+   "sigma_pop_mean": 0.2439193632446259,
    "park_sd_mean": null,
-   "max_rhat": 1.1106,
-   "divergences": 5
+   "max_rhat": 1.0582,
+   "divergences": 1
   },
   "P/bb": {
-   "tau_mean": 0.10301938551720176,
-   "sigma_pop_mean": 0.2993538468296573,
+   "tau_mean": 0.06228166475651615,
+   "sigma_pop_mean": 0.29007007585022315,
    "park_sd_mean": null,
-   "max_rhat": 1.0304,
-   "divergences": 16
+   "max_rhat": 1.0419,
+   "divergences": 69
   },
   "P/hbp": {
-   "tau_mean": 0.1176629564839465,
-   "sigma_pop_mean": 0.4570939363606882,
+   "tau_mean": 0.0846080186326799,
+   "sigma_pop_mean": 0.4499133963746602,
    "park_sd_mean": null,
-   "max_rhat": 1.0244,
-   "divergences": 8
+   "max_rhat": 1.1122,
+   "divergences": 0
   },
   "P/hr": {
-   "tau_mean": 0.05464727254296646,
-   "sigma_pop_mean": 0.17508201289022707,
-   "park_sd_mean": 0.1202692428289787,
-   "max_rhat": 1.1044,
-   "divergences": 4,
+   "tau_mean": 0.03883004731883135,
+   "sigma_pop_mean": 0.17061064136846452,
+   "park_sd_mean": 0.12207439217311801,
+   "max_rhat": 1.0758,
+   "divergences": 0,
    "top_hr_parks": [
     {
      "venue_id": 2602,
      "venue_name": "Great American Ball Park",
-     "phi": 0.19656500076755304
+     "phi": 0.19441150752295427
     },
     {
      "venue_id": 3309,
      "venue_name": "Nationals Park",
-     "phi": 0.19636337654184877
+     "phi": 0.18855127646356906
     },
     {
      "venue_id": 2529,
      "venue_name": "Sutter Health Park",
-     "phi": 0.15157234953386295
+     "phi": 0.155423671737469
     }
    ],
    "bottom_hr_parks": [
     {
      "venue_id": 2395,
      "venue_name": "Oracle Park",
-     "phi": -0.23453085911750676
+     "phi": -0.24173098065278867
     },
     {
      "venue_id": 2889,
      "venue_name": "Busch Stadium",
-     "phi": -0.22373698761980573
+     "phi": -0.22711291949863735
     },
     {
      "venue_id": 31,
      "venue_name": "PNC Park",
-     "phi": -0.09528118729102275
+     "phi": -0.1035835993219629
     }
    ]
   },
   "P/hit_bip": {
-   "tau_mean": 0.02570911970532621,
-   "sigma_pop_mean": 0.048445407353513076,
-   "park_sd_mean": 0.08319882614912406,
-   "max_rhat": 1.0315,
-   "divergences": 5
+   "tau_mean": 0.023450729783920474,
+   "sigma_pop_mean": 0.046746355337930555,
+   "park_sd_mean": 0.08411744757863375,
+   "max_rhat": 1.0375,
+   "divergences": 3
   }
  },
- "max_rhat": 1.1106,
- "total_divergences": 97
+ "max_rhat": 1.1603,
+ "total_divergences": 89
 }

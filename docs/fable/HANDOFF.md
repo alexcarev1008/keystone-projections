@@ -71,6 +71,13 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   averages) and adds the M2 paragraph plus a separate 2025 holdout table with one honest
   sentence: Tier 2 scored slightly below Marcel on both key stats, with cov80 in band. meta.json
   picks the new fields up on Daniel's next `make project`._
+  _Opus 2026-09-18 (re-check): Daniel's `make project` finished at 16:19. It started about 15:44,
+  before this item's 16:12 commit, so it wrote a pre-item meta.json with no `model_config` and no
+  per-stage `sigma_obs_mean`/`sigma_env`. The fits themselves ran the locked config, which was wired
+  at 14:54. `sigma_env` can be recomputed (H/hit_bip .0213, H/hr .1129, …), but `sigma_obs` only exists
+  in the posterior, so meta can't be backfilled honestly. It needs one more `make project`. The page
+  degrades cleanly without the fields: σ columns show "—" and the config line is hidden.
+  Methodology's M2 paragraph and the holdout sentence are in place; `npm run build` passes._
 - [x] (M2c, URGENT — BEFORE the holdout re-run) repair the canonical state after the
   misconfigured 2025 holdout (M2_experiments.md §"The 2025 holdout"): the 14:53 run raced the
   `handoff: M2c` commit and merged old-config (`mean3`/`obs_noise:false`) 2025 rows into the
@@ -112,6 +119,21 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   proceeds when flags match; it re-checks when the file changes mid-fit; and the CLI refuses
   end-to-end through the real `bt.run`. Mutation-checked: removing the writer guard or the CLI
   guard turns tests red. 49 pass._
+- [ ] (artifact check B, Opus-filed 2026-09-18, no modelling change) null waterfall steps render as
+  0, and dead NaN rows ship in projections — see STATUS Results "Artifact check B". (a)
+  `frontend/src/components/Waterfall.tsx`: skip steps whose `value` is null. Don't draw a bar or a
+  `.000` value for them, and compute each delta sentence against the last non-null step, so
+  Aging → Neutral park reads as one delta instead of −.29/+.29 through a fake Statcast 0. If step 0 is
+  null, start the chart at the first non-null step. (b) `backend/keystone/project.py`
+  `waterfall_frame`: wrap the step-0 `to_stage_probs`/`derived_stats` call in
+  `np.errstate(divide="ignore", invalid="ignore")` so the 0/0 `xbh / h_bip` stays an honest NaN
+  without the warning spam. Don't touch the verified `marcel.py`. (c) `project.py` `projections_frame`:
+  under marcel-anchor, drop ids whose Marcel stage rates are NaN (the 868 players with no 2024–26
+  line, 27,256 all-NaN rows), and have the schema check fail on any non-finite q10..q90/mean — ✔
+  `projections.parquet` has 0 non-finite quantile rows; a Judge (592450) page shows no .000 Statcast
+  row and no ±.29 sentences; Tony Kemp (643393) renders without a .000 3-year line; `make test`
+  green; `npm run build` passes. The `make project` re-run that acceptance needs can be the same
+  one that fills meta.json's `model_config`/`sigma_obs_mean`.
 - [ ] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
   runs: `run()` writes `backtest_predictions{_quick}.parquet` / `backtest_posteriors{_quick}.parquet`
   into `out.parent`, so consecutive `--out ../data/artifacts/m2/backtest_E*.json` runs overwrite

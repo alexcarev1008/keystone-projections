@@ -51,10 +51,14 @@
      `obs_noise: True`, guard passed, no `--force`). **The holdout is SPENT.**
   3. ~~Paste the printed 2025 table back~~ DONE — recorded in `M2_experiments.md`
      §"The 2025 holdout" and in Results below.
-  4. **← NEXT (Daniel):** `make project` (~35 min) then `make diagnostics` (~10 s) — production
-     artifacts + context pack under the locked config (meta.json then gains `model_config` and
-     per-stage `sigma_obs_mean`/`sigma_env`). HANDOFF item 4 DONE 2026-09-18 (Opus). The only open
-     HANDOFF item is M2b's sidecar-filename collision. Then M3 (or cut per budget) / M4.
+  4. ~~`make project` + `make diagnostics`~~ DONE 16:19. The run started before the HANDOFF item 4
+     commit, though, so meta.json has no `model_config` / `sigma_obs_mean` / `sigma_env`. The
+     projections are the locked config. Artifact checks A and B (Results) ran on these files.
+  5. **← NEXT (Opus):** the new "artifact check B" HANDOFF item (Waterfall null steps render as 0 on
+     every player page; drop the 868 all-NaN players; silence the step-0 0/0). Then **(Daniel)**
+     `make project` (~35 min) + `make diagnostics` once. That single re-run fills meta.json and
+     serves as the acceptance check for that item. Also open: M2b's sidecar-filename collision.
+     Then M3 (or cut per budget) / M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -112,6 +116,57 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### Artifact check A — why H bands don't widen h1→h4 — Opus (2026-09-18, read-only, 16:19 `make project` artifacts)
+**Not a bug.** The model does what it says; the MANUAL §10 ">95% widen" check measures the wrong space.
+- **Denominator.** 12.5% H / 66.4% P count the 868 all-NaN players (check B) as "not widening". Among
+  finite rows: H wOBA 157/892 = **17.6%**, P FIP 1113/1177 = **94.6%** (P3 pre-M2: 42.5% / 60.1%).
+- **Drift does accumulate, in logit space.** Per-stat logit sd h1→h4 widens for 100% H k_pct, 98% H hr_pct,
+  96% H babip, 100% P k_pct (medians: H k .195→.269, H hr .319→.347, H babip .087→.093).
+- **Rate space is where it's lost.** Share of H players that widen h1→h4: k_pct 100%, babip 85%, bb 84%, but
+  hr_pct 21%, iso 17%, slg 8.5%, wOBA 17.6%. wOBA by age: ≤25 52%, 26–28 18%, 29–31 2.5%, 32+ 11%, while
+  the median q50 moves −.002 / −.013 / −.020 / −.032. hr_pct: ≤25 68% widen, 32+ 0.8% (width ×0.89).
+  Mechanism: aging pulls HR/XBH rates down, and a low-p band's width scales with p·(1−p) × logit-sd,
+  which is roughly proportional to p. A ~15% fall in HR rate cuts the band ~15% while the logit sd only
+  grows ~9%. Pitchers show the mirror image: aging pushes the bad-event rates up (FIP q50 +.62 for 32+), so
+  the bands grow with the level (32+: 99.8% widen).
+- **Is h1 inflated by obs-noise / env shock? Mostly no.** H/hit_bip h1 logit variance ≈ .0076, of which
+  τ² .0001 (1%), σ_env² .00045 (6%, σ_env .0213), σ_obs² ≈ .00085 (11%; .029 is the 2025-fit value because
+  production σ_obs isn't in meta yet). The remaining ~81% is posterior talent uncertainty. h4 adds only
+  3τ² = .0003 (+2% sd). Dropping σ_obs and σ_env entirely would move the h4/h1 sd ratio from 1.021 to
+  1.026. For H/hr the constants are a larger share (τ² .009, σ_env² .013, σ_obs² ≈ .015 of ≈ .102):
+  sd ratio 1.125 with them vs ≈ 1.17 without. So they dilute growth but don't drive the result.
+- **Tiny taus: yes, and M2 shrank them.** Obs-noise absorbed part of what used to be drift (2024-target
+  fits, pre-M2 → E5E6): H/hr .175→.136, H/k .124→.095, H/xbh .030→.021, H/hit_bip .013→.011. Together with
+  the constant σ_obs/σ_env terms, that explains the fall from 42.5% to 17.6%.
+- **Reading.** Growth is small because hit_bip/xbh τ is tiny and h1 is dominated by talent uncertainty.
+  Where rate-space bands shrink, the cause is hitter aging dragging HR/XBH levels down. A logit
+  random walk with a declining level doesn't imply wider rate-space bands. Suggest re-stating the
+  acceptance check as "per-stage logit sd widens for >95%" (passes at 96–100%). This is a doc
+  change, not a modelling one; no HANDOFF item.
+
+### Artifact check B — NaN/inf in projections/history — Opus (2026-09-18, read-only)
+- **history.parquet: clean.** 0 inf. NaNs are structural only: pitcher columns on H rows (4,446) and
+  hitter columns on P rows (5,454).
+- **projections.parquet: 27,256 / 92,324 rows NaN (29.5%), 0 inf.** They belong to 868 players
+  (369 H, 499 P), and each of them is NaN in every row, stat and horizon. All have `pt` NaN, none is in
+  `players.parquet` or `history.parquet` (both only carry players active 2024+), and their h1 ages run
+  26–47 (median 34). So these are state-space fit-window players with no 2024–26 Marcel line: the
+  Marcel anchor is NaN, so every anchored draw is NaN. They come from missing data, not from the
+  divide-by-zero. **API/UI: not shown.** `/api/players/{id}` 404s (not in players), and the leaderboard
+  drops them (`pt >= min_pt` is False for NaN). They do distort artifact-level checks (see A).
+- **The divide-by-zero warnings come from `waterfall.parquet`, not projections.** `marcel.to_stage_probs`
+  computes `xbh / h_bip`, which is 0/0 when a player had no hits on balls in play in 2024–26
+  (`triple` is guarded, `xbh` isn't). The result is a NaN step 0 (3-year line) for 391 H + 1 P players.
+  **23 of them are visible** (in players.parquet, e.g. Tony Kemp 643393, Greg Allen 656185, Grae
+  Kessinger 666197, Kyler Fedko 693459, Evan Justice 687145 (P); all have 1–25 PA / 0.1 IP since 2024).
+- **UI bug (genuine, every player page).** `Waterfall.tsx` renders `value ?? 0`. Step 3 (Statcast) is
+  NaN→null for all 2,937 waterfalls by design (Tier 3 isn't shipped), so, from reading the code, every
+  player page shows a "Statcast contact quality .000" row and delta sentences of about −.29 and then
+  +.29 wOBA. It also stretches the bar axis down to 0. The 23 players above also get a .000 3-year line.
+  Filed as a HANDOFF item.
+- Side note: 261 finite-projection players (every one whose last season is 2024) have `pt` NaN at
+  h1. They are left off the leaderboard by design and show `pt` null on their pages. Not a bug.
 
 ### 2025 holdout attempt 2 — SPENT (Daniel, 2026-09-18, locked config, guard passed, no --force)
 Full record + reading: `M2_experiments.md` §"The 2025 holdout". Key rows (marcel | tier2):
