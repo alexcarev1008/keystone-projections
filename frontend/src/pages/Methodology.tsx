@@ -9,6 +9,8 @@ const KEY_STATS: Record<'H' | 'P', string[]> = {
 
 type StageSummary = {
   tau_mean?: number | null
+  sigma_obs_mean?: number | null
+  sigma_env?: number | null
   sigma_pop_mean?: number | null
   park_sd_mean?: number | null
   max_rhat?: number | null
@@ -17,16 +19,20 @@ type StageSummary = {
   bottom_hr_parks?: Array<{ venue_id: number; venue_name: string; phi: number }>
 }
 
+const fmt3 = (x: number | null | undefined) => (x !== null && x !== undefined ? x.toFixed(3) : '—')
+
 function mean(xs: number[]): number | null {
   const clean = xs.filter(Number.isFinite)
   if (clean.length === 0) return null
   return clean.reduce((a, b) => a + b, 0) / clean.length
 }
 
-function summariseBacktest(bt: Backtest, role: 'H' | 'P'): { stat: string; marcel: number | null; tier2: number | null; tier3: number | null; cov80_t2: number | null; cov80_t3: number | null }[] {
+// Development scoring excludes the holdout season, which is reported on its own below.
+function summariseBacktest(bt: Backtest, role: 'H' | 'P', target?: number): { stat: string; marcel: number | null; tier2: number | null; tier3: number | null; cov80_t2: number | null; cov80_t3: number | null }[] {
   if (!bt) return []
   const stats = KEY_STATS[role]
-  const rows = bt.rows.filter(r => r.role === role && r.stat && r.stat !== '_diagnostics')
+  const rows = bt.rows.filter(r => r.role === role && r.stat && r.stat !== '_diagnostics'
+    && (target !== undefined ? r.target === target : r.target !== bt.holdout_target))
   return stats.map(stat => {
     const subset = (tier: string) => rows.filter(r => r.tier === tier && r.stat === stat)
     return {
@@ -49,6 +55,8 @@ function StageTable({ stages, roleTag }: { stages: Record<string, StageSummary>;
         <tr>
           <th>Stage</th>
           <th className="numeric">τ</th>
+          <th className="numeric">σ_obs</th>
+          <th className="numeric">σ_env</th>
           <th className="numeric">σ_pop</th>
           <th className="numeric">park_sd</th>
           <th className="numeric">max r̂</th>
@@ -59,10 +67,12 @@ function StageTable({ stages, roleTag }: { stages: Record<string, StageSummary>;
         {entries.map(([k, v]) => (
           <tr key={k}>
             <td>{k.split('/')[1]}</td>
-            <td className="numeric">{v.tau_mean !== null && v.tau_mean !== undefined ? v.tau_mean.toFixed(3) : '—'}</td>
-            <td className="numeric">{v.sigma_pop_mean !== null && v.sigma_pop_mean !== undefined ? v.sigma_pop_mean.toFixed(3) : '—'}</td>
-            <td className="numeric">{v.park_sd_mean !== null && v.park_sd_mean !== undefined ? v.park_sd_mean.toFixed(3) : '—'}</td>
-            <td className="numeric">{v.max_rhat !== null && v.max_rhat !== undefined ? v.max_rhat.toFixed(3) : '—'}</td>
+            <td className="numeric">{fmt3(v.tau_mean)}</td>
+            <td className="numeric">{fmt3(v.sigma_obs_mean)}</td>
+            <td className="numeric">{fmt3(v.sigma_env)}</td>
+            <td className="numeric">{fmt3(v.sigma_pop_mean)}</td>
+            <td className="numeric">{fmt3(v.park_sd_mean)}</td>
+            <td className="numeric">{fmt3(v.max_rhat)}</td>
             <td className="numeric">{v.divergences ?? 0}</td>
           </tr>
         ))}
@@ -116,6 +126,33 @@ function BacktestTable({ bt, role, label }: { bt: Backtest; role: 'H' | 'P'; lab
   )
 }
 
+function HoldoutTable({ bt, target }: { bt: Backtest; target: number }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Stat</th>
+          <th className="numeric">Marcel RMSE</th>
+          <th className="numeric">Tier 2 RMSE</th>
+          <th className="numeric">Tier 2 cov80</th>
+        </tr>
+      </thead>
+      <tbody>
+        {(['H', 'P'] as const).flatMap(role => summariseBacktest(bt, role, target).map(r => (
+          <tr key={`${role}-${r.stat}`}>
+            <td>{role}</td>
+            <td>{statLabel(r.stat)}</td>
+            <td className="numeric">{r.marcel !== null ? fmtStat(r.stat, r.marcel) : '—'}</td>
+            <td className="numeric">{r.tier2 !== null ? fmtStat(r.stat, r.tier2) : '—'}</td>
+            <td className="numeric">{r.cov80_t2 !== null ? r.cov80_t2.toFixed(2) : '—'}</td>
+          </tr>
+        )))}
+      </tbody>
+    </table>
+  )
+}
+
 export default function Methodology() {
   const [meta, setMeta] = useState<Meta | null>(null)
   const [bt, setBt] = useState<Backtest>(null)
@@ -134,6 +171,13 @@ export default function Methodology() {
   const hrParks = stages['H/hr']
   const holdoutTarget = bt?.holdout_target ?? null
   const holdoutRows = bt?.rows.filter(r => r.target === holdoutTarget) ?? []
+  const devTargets = (bt?.targets ?? []).filter(t => t !== holdoutTarget)
+  const devSpan = devTargets.length ? `${Math.min(...devTargets)}–${Math.max(...devTargets)}` : '2021–2024'
+  const cov = (role: 'H' | 'P') => {
+    const g = bt?.gates?.[role]?.tier2 as unknown as { cov80_mean?: number } | null | undefined
+    return g?.cov80_mean !== undefined ? g.cov80_mean.toFixed(2) : '—'
+  }
+  const cfg = meta.model_config
 
   return (
     <div className="methodology">
@@ -179,14 +223,26 @@ export default function Methodology() {
       <p>For each (role, stage), fit on the last six seasons:</p>
       <pre>{`theta[i, first] = lam · z(log PA'_first) + sigma_pop · e
 theta[i, t]     = theta[i, t-1] + g[age] + tau · e
-y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park · phi))`}</pre>
+y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park · phi + sigma_obs · eps[i, t]))`}</pre>
       <ul>
         <li><code>mu_league[t]</code>: the fixed league logit from that season (juiced ball, rule changes, etc.).</li>
         <li><code>tau</code>: talent drift — effectively a learned recency weight per stat.</li>
         <li><code>sigma_pop</code>: true-talent spread across the population.</li>
         <li><code>g[age]</code>: a smooth aging curve fit jointly across all seasons (not delta-method paired seasons).</li>
         <li><code>phi</code>: park effects on the park stages, with 0.5 · share exposure per team.</li>
+        <li><code>sigma_obs</code>: transient season-level noise, fitted per stage and not carried forward.</li>
       </ul>
+      <p>
+        A transient season-level noise term (<code>sigma_obs</code>) separates single-season wiggle
+        from talent drift, so a one-year spike no longer has to be explained as a change in true
+        talent. Projection intervals also carry a common league-environment shock
+        (<code>sigma_env</code>, the sd of year-over-year changes in the league rate), because
+        next season's league level is itself uncertain and moves every player together.
+        {cfg && (
+          <span className="muted"> Production config: <code>obs_noise = {String(cfg.obs_noise)}</code>,{' '}
+            <code>env_mode = {cfg.env_mode}</code>.</span>
+        )}
+      </p>
       <p>
         Sampled with nutpie: 500 draws × 4 chains in production, target_accept = 0.9. Stage
         posteriors are combined index-by-index (an approximation that ignores between-stage
@@ -236,7 +292,7 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
 
       <h2>Validation</h2>
       <p>
-        Rolling-origin backtests on 2021–2024 (window_end = T−1). Point projections are Tier 2/3
+        Rolling-origin backtests on {devSpan} (window_end = T−1). Point projections are Tier 2/3
         posterior means at horizon 1; Marcel is Marcel. Metrics are averaged across targets.
         Intervals use <code>simulate_season</code> at each player's actual PA'/BF' (pitcher FIP
         uses actual IP).
@@ -257,13 +313,30 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
             <strong>P = {bt.production_tier.P}</strong>.
             {' '}Where Tier 2 fails, production ships Marcel points with Tier 2 bands (§6).
           </p>
-          {holdoutTarget !== null && (
-            <p>
-              Holdout target: {holdoutTarget}. {holdoutRows.length === 0
-                ? 'Unspent — reserved for after model iteration.'
-                : `Scored (${holdoutRows.length} rows).`}
-            </p>
-          )}
+          <p>
+            <strong>Model iteration (M2).</strong> The original Tier 2 intervals were too narrow
+            for pitchers. Two changes were tested against pre-registered expectations and accepted: the
+            season-level noise term and the league-environment shock. A recency-weighted league
+            point, fat-tailed talent innovations and a reliever effect were rejected, and correlated
+            stages were considered but not built. Mean 80% coverage is now in
+            the [.75, .85] band for both roles (H {cov('H')}, P {cov('P')}). Point accuracy still does not
+            clear the gate against Marcel, so shipped points remain Marcel's. The configuration was
+            locked and committed before any {holdoutTarget ?? 2025} number was computed.
+          </p>
+          {holdoutTarget !== null && (holdoutRows.length === 0 ? (
+            <p>Holdout target: {holdoutTarget}. Unspent — reserved for after model iteration.</p>
+          ) : (
+            <div style={{ marginTop: 16 }}>
+              <h3>{holdoutTarget} holdout (scored once, locked config)</h3>
+              <HoldoutTable bt={bt} target={holdoutTarget} />
+              <p style={{ marginTop: 12 }}>
+                On the untouched {holdoutTarget} season, Tier 2 scored slightly <em>below</em> Marcel on
+                both key stats (wOBA and FIP RMSE), while its 80% intervals stayed in band. One season
+                can't settle the points question either way. It does confirm the one claim the
+                shipped bands make, that they are calibrated.
+              </p>
+            </div>
+          ))}
         </>
       ) : <div className="muted">No backtest available.</div>}
 

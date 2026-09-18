@@ -56,7 +56,7 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   the promoted sidecars; `/api/meta` serves the new backtest block.
   _Opus 2026-09-18: copies are byte-identical to the m2 files. The superseded post-M1 baseline
   (incl. its pre-M2 tier3 rows) is archived as `m2/backtest_base{,_predictions,_posteriors}.*`._
-- [ ] (M2c) `frontend/src/pages/Methodology.tsx` + `backend/keystone/project.py` meta writer —
+- [x] (M2c) `frontend/src/pages/Methodology.tsx` + `backend/keystone/project.py` meta writer —
   document the locked model: (a) state-space section gains two sentences: a transient
   season-level noise term (sigma_obs, non-persistent, fitted per stage) separates single-season
   wiggle from talent drift, and projection intervals carry a common league-environment shock
@@ -64,6 +64,13 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `model_config: {obs_noise: true, env_mode: "shock"}` and per-stage sigma_obs alongside tau;
   (c) Validation section: coverage now in band for both roles (H .82, P .76), gates still
   Marcel on points, and the M2 story in one paragraph — ✔ `npm run build` passes.
+  _Opus 2026-09-18: `StageFit` carries `sigma_obs_mean` + `mu_sd`; meta stages gain
+  `sigma_obs_mean` and `sigma_env`, meta gains `model_config` (also in the schema check). The
+  Methodology page adds σ_obs/σ_env columns, the obs-noise term in the model equation, and the
+  two sentences. Validation now scores dev targets only (the holdout is excluded from the
+  averages) and adds the M2 paragraph plus a separate 2025 holdout table with one honest
+  sentence: Tier 2 scored slightly below Marcel on both key stats, with cov80 in band. meta.json
+  picks the new fields up on Daniel's next `make project`._
 - [x] (M2c, URGENT — BEFORE the holdout re-run) repair the canonical state after the
   misconfigured 2025 holdout (M2_experiments.md §"The 2025 holdout"): the 14:53 run raced the
   `handoff: M2c` commit and merged old-config (`mean3`/`obs_noise:false`) 2025 rows into the

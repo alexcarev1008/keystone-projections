@@ -90,6 +90,7 @@ export type Meta = {
   window_end?: number
   projection_season?: number
   production_tier?: { H?: string; P?: string }
+  model_config?: { obs_noise?: boolean; env_mode?: string }
   max_rhat?: number
   total_divergences?: number
   stages?: Record<string, Record<string, unknown>>

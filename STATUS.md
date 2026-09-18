@@ -14,7 +14,7 @@
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
-- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: HANDOFF item 4 (Methodology/meta docs), `make project`, `make diagnostics`
+- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: `make project`, `make diagnostics` (HANDOFF item 4 done)
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -52,8 +52,9 @@
   3. ~~Paste the printed 2025 table back~~ DONE — recorded in `M2_experiments.md`
      §"The 2025 holdout" and in Results below.
   4. **← NEXT (Daniel):** `make project` (~35 min) then `make diagnostics` (~10 s) — production
-     artifacts + context pack under the locked config. Opus: HANDOFF item 4 (Methodology +
-     meta.json docs) is the last open M2c item. Then M3 (or cut per budget) / M4.
+     artifacts + context pack under the locked config (meta.json then gains `model_config` and
+     per-stage `sigma_obs_mean`/`sigma_env`). HANDOFF item 4 DONE 2026-09-18 (Opus). The only open
+     HANDOFF item is M2b's sidecar-filename collision. Then M3 (or cut per budget) / M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in

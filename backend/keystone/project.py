@@ -143,8 +143,10 @@ class StageFit:
     tau_mean: float
     sigma_pop_mean: float
     park_sd_mean: float | None
+    sigma_obs_mean: float | None       # None when obs_noise is off
     phi_mean: np.ndarray | None        # (n_venues,)
     mu_proj: float
+    mu_sd: float                       # league-environment shock sd (0 under env_mode mean3)
     max_rhat: float | None
     divergences: int
 
@@ -231,7 +233,8 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
                                  if P_park_aware is not None else None),
                    venues=list(d.venues), g_age=g_age, tau_mean=tau_mean,
                    sigma_pop_mean=sigma_pop_mean, park_sd_mean=park_sd_mean,
-                   phi_mean=phi_mean, mu_proj=mu_proj,
+                   sigma_obs_mean=sigma_obs_mean, phi_mean=phi_mean, mu_proj=mu_proj,
+                   mu_sd=float(mu_sd),
                    max_rhat=rh, divergences=diag["divergences"])
     del idata, model, d, P_neutral, P_park_aware
     gc.collect()
@@ -616,7 +619,7 @@ def league_frame(b: Bundle, roles: list[str], window_end: int, horizons: int) ->
 
 
 def meta_dict(fits: dict, roles: list[str], stage_map: dict, window_end: int, horizons: int,
-              prod_tier: dict, b: Bundle) -> dict:
+              prod_tier: dict, b: Bundle, model_config: dict | None = None) -> dict:
     stages_summary = {}
     max_rhat = None
     total_divergences = 0
@@ -625,7 +628,8 @@ def meta_dict(fits: dict, roles: list[str], stage_map: dict, window_end: int, ho
             f = fits.get((role, stage))
             if f is None:
                 continue
-            entry = {"tau_mean": f.tau_mean, "sigma_pop_mean": f.sigma_pop_mean,
+            entry = {"tau_mean": f.tau_mean, "sigma_obs_mean": f.sigma_obs_mean,
+                     "sigma_env": f.mu_sd, "sigma_pop_mean": f.sigma_pop_mean,
                      "park_sd_mean": f.park_sd_mean, "max_rhat": f.max_rhat,
                      "divergences": f.divergences}
             if stage == "hr" and f.phi_mean is not None and len(f.venues):
@@ -648,6 +652,7 @@ def meta_dict(fits: dict, roles: list[str], stage_map: dict, window_end: int, ho
             "projection_season": int(window_end + 1),
             "horizons": int(horizons),
             "production_tier": prod_tier,
+            "model_config": model_config or {"obs_noise": True, "env_mode": "shock"},
             "stages": stages_summary,
             "max_rhat": max_rhat,
             "total_divergences": total_divergences}
@@ -690,7 +695,7 @@ def assert_schema(out_dir: Path) -> None:
     if not meta.exists():
         raise AssertionError(f"missing artifact: {meta}")
     for key in ("generated_at", "data_through", "window_end", "projection_season",
-                "production_tier", "stages", "max_rhat", "total_divergences"):
+                "production_tier", "model_config", "stages", "max_rhat", "total_divergences"):
         if key not in json.loads(meta.read_text()):
             raise AssertionError(f"meta.json missing key {key}")
     print(f"[project] schema check OK: {len(SCHEMAS)} parquet + meta.json")
@@ -840,7 +845,8 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
     history = history_frame(b, ids_by_role)
     players = players_frame(b, ids_by_role)
     league = league_frame(b, roles, window_end, horizons)
-    meta = meta_dict(fits, roles, stage_map, window_end, horizons, prod_tier, b)
+    meta = meta_dict(fits, roles, stage_map, window_end, horizons, prod_tier, b,
+                     model_config={"obs_noise": bool(obs_noise), "env_mode": env_mode})
 
     _write_artifacts(out, players, history, projections, waterfall, aging, league, meta)
     assert_schema(out)
