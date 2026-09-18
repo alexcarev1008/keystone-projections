@@ -15,7 +15,7 @@
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
 - [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: `make project`, `make diagnostics` (HANDOFF item 4 done)
-- [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
+- [x] M3 Playing time + attrition hurdle model ($20) — done 2026-09-18, see `docs/fable/M3_playing_time.md`: Bayesian hurdle (P(plays) × E[PT|plays]) **beats Marcel PT 8/8 dev targets on the pre-registered RMSE gate** (H −25%, P −11%; bias +42..+127 PA → ±7, +6..+22 IP → ±1.1); multi-year outlook defined as expected production (p_play × conditional) with `p_play`/`pt_expected`/`p_regular` per horizon → 3 HANDOFF items for Opus (artifacts, API/UI, CLI)
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
 
@@ -29,6 +29,7 @@
 | M2a | $20 | Daniel fills in (Fable self-estimate ~$8: input ~250k, output ~20k) | ~$13 |
 | M2b | $20 | Daniel fills in (Fable self-estimate ~$7: input ~220k, output ~18k) | ~$20 |
 | M2c | $15 | Daniel fills in (Fable self-estimate ~$6: input ~200k, output ~12k) | ~$26 |
+| M3 | $20 | Daniel fills in (Fable self-estimate ~$4: input ~110k, output ~12k) | ~$30 |
 
 ## Next command(s) for Daniel
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
@@ -58,7 +59,8 @@
      every player page; drop the 868 all-NaN players; silence the step-0 0/0). Then **(Daniel)**
      `make project` (~35 min) + `make diagnostics` once. That single re-run fills meta.json and
      serves as the acceptance check for that item. Also open: M2b's sidecar-filename collision.
-     Then M3 (or cut per budget) / M4.
+     Then the three M3 HANDOFF items (PT hurdle → artifacts, API/UI, CLI; same `make project`
+     re-run can serve both acceptance checks). Then M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -116,6 +118,21 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M3 PT hurdle backtest — Fable (2026-09-18, run locally, seed 1, dev targets only)
+Pre-registered gate: hurdle expected-PT RMSE < Marcel PT RMSE in ≥3/4 dev targets per role.
+Result: **8/8** (full table in `M3_playing_time.md` §3). RMSE (marcel → hurdle):
+H 2021 190.5→156.8 · 2022 190.7→141.6 · 2023 205.0→144.0 · 2024 201.9→142.7
+P 2021 37.2→35.2 · 2022 41.1→35.7 · 2023 42.1→34.7 · 2024 44.0→36.9
+Bias: Marcel +42..+127 PA / +6..+22 IP; hurdle ±7 PA / ±1.1 IP. p_play Brier beats base
+rate on all 8; decile calibration clean for P, H over-predicts play prob in the bottom two
+deciles (conservative direction). Fits are seconds each (nutpie), run locally per §4 rule 4
+— no Daniel compute needed. 2025 untouched. `make test` 55 pass. Multi-year outlook =
+p_play × conditional production; per-horizon `p_play`/`pt_expected`/`p_regular` via
+posterior simulation with feature roll-forward. Trustworthiness verdict (M3 doc §5):
+conditional bands fine per artifact check A + holdout cov80; h2–h4 intervals are
+model-implied, not backtested — label them so; the dominant multi-year error (conditional
+numbers for 50–86%-attrition players) is what the hurdle fixes.
 
 ### Artifact check A — why H bands don't widen h1→h4 — Opus (2026-09-18, read-only, 16:19 `make project` artifacts)
 **Not a bug.** The model does what it says; the MANUAL §10 ">95% widen" check measures the wrong space.
@@ -664,6 +681,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-18 — M2c wiring: `holdout` refuses to run unless its flags match `backtest.json.experiment_flags`. The holdout is one-shot, and a mismatch means scoring a model the gates weren't decided on (which the unwired holdout would have done).
 - 2026-09-18 — M2c promotion: the superseded post-M1 baseline backtest (JSON + untracked sidecars, incl. the pre-M2 tier3 rows) is archived under `data/artifacts/m2/backtest_base*` rather than discarded, because the M2 verdicts cite its numbers.
 - 2026-09-18 — M2c holdout spent: attempt 2 ran the locked config clean (guard passed). Recorded as measured: tier2 beats Marcel on neither 2025 key stat (H −.0004, P −.0082) but cov80 is in band on both (.83/.75) — shipping mode (Marcel points + Tier 2 bands) unchanged and now holdout-validated on its calibration claim. No tuning, no re-run, M2 closed.
+- 2026-09-18 — M3: PT hurdle ships (pre-registered RMSE gate, 8/8 dev targets vs Marcel PT; 2025 untouched). Multi-year outlook = expected production (p_play × conditional) alongside conditional lines; h2–h4 intervals labelled model-implied per artifact check A + M3 doc §5. Missed-time proxy kept but near-zero coefficient once s1/s2 in the model — recorded, not re-tuned.
 - 2026-09-18 — M2c holdout ruling: attempt 1 (14:53) scored the superseded config because the run raced the wiring commit — ruled invalid, holdout NOT spent; one locked-config re-run authorised with pre-commitments recorded (config ships regardless of the now-leaked old-vs-new 2025 comparison; no modelling decision changes on the misfire numbers; spent after the re-run whatever it says).
 - 2026-09-18 — M2c: production configuration locked = tier2 `--obs-noise --env-mode shock` (the `backtest_E5E6.json` run, seed 1) — E5 and E6 passed every pre-registered sub-check; E3 rejected (core sub-check unverifiable + r_hat 1.363 + gain subsumed by E5); `--innov t4` declined (relabelling reappears under obs-noise, no geometry win); correlated stages declined with reasons (weak observed corr, binding losses are regime errors, rebuild cost). Gates still FAIL → Marcel points + Tier 2 bands; holdout runs the locked config after Opus wires the flags.
 - 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.

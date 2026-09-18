@@ -143,3 +143,27 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
   default names so `make diagnostics` keeps working.
 
+- [ ] (M3, Fable-filed 2026-09-18) Wire the playing-time hurdle into artifacts. `backend/keystone/project.py`:
+  in `run()`, per role, build `PT.training_table(b.ps[role], role, projection_season)` and
+  `PT.fit_pt` (module `keystone.models.playing_time`; seconds per fit, seed from the CLI seed),
+  then `PT.build_pt_table(b.ps[role], role, projection_season)` on the projection population and
+  `PT.simulate_horizons(fit, table, horizons=4)`. Join per (mlbam_id, horizon) onto
+  `projections.parquet` as three new columns: `p_play`, `pt_expected`, `p_regular`
+  (REGULAR_PT = 300 PA / 100 IP). Keep the existing `pt` column (Marcel, h=1) untouched for
+  compatibility; leaderboard keeps using it. Players in projections but outside the PT population
+  (no PT in the last two seasons) get NaN in the new columns — ✔ `make project` writes the columns;
+  for a healthy regular (Judge 592450) h1 `p_play` > .95 and `pt_expected` within ±15% of Marcel `pt`;
+  for an age-36 <150-PA player `pt_expected` < 100 at h1 and declines with h; `assert_schema` updated;
+  `make test` green.
+- [ ] (M3) Surface expected production in the API + UI. `api/main.py`: include the three columns in
+  the player payload per horizon. Frontend `AgingOutlook` (or the multi-year section): show two
+  lines per horizon — "if he plays" (existing conditional stats) and "expected" (counting stats
+  scaled by `pt_expected`; rate stats unchanged, labelled with `p_play`), plus a
+  "chance still an MLB regular" chip from `p_regular` at h=4. Copy for the Methodology page:
+  (a) expected = p(plays) × conditional, independence assumption stated; (b) beyond year 1 the
+  intervals are model-implied, not backtested; (c) PT hurdle beat Marcel PT on RMSE 8/8 dev
+  targets (H −25%, P −11%, bias +126→+3 PA, +22→+1 IP), table in docs/fable/M3_playing_time.md —
+  ✔ a fringe veteran's page shows expected ≪ conditional counting stats; `npm run build` passes.
+- [ ] (M3) CLI + backtest hook (small): add `keystone.pipeline` subcommand `pt-backtest` running
+  `PT.backtest_pt(b.ps, C.DEV_TARGETS)` and printing the table (no JSON artifact needed) — ✔ command
+  runs end-to-end in ≲3 min and matches docs/fable/M3_playing_time.md §3 numbers at seed 1.
