@@ -58,7 +58,8 @@ def cmd_backtest(args: argparse.Namespace) -> None:
 
     C.ensure_dirs()
     bt.run(targets=args.targets, tier=args.tier, quick=args.quick, roles=args.roles,
-           stages=args.stages, out=args.out, seed=args.seed)
+           stages=args.stages, out=args.out, seed=args.seed,
+           park_aware=not args.park_neutral)
 
 
 def cmd_project(args: argparse.Namespace) -> None:
@@ -133,6 +134,8 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--stages", nargs="+", default=None)
     k.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
     k.add_argument("--seed", type=int, default=1)
+    k.add_argument("--park-neutral", action="store_true",
+                   help="score Tier 2/3 with park-neutral projections (pre-M1 behaviour)")
     k.set_defaults(func=cmd_backtest)
 
     p = sub.add_parser("project", help="write production artifacts to data/artifacts/ (§7)")

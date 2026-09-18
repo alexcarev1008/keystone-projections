@@ -11,7 +11,7 @@
 - [x] P6.5 Fable context pack (`make diagnostics`)
 
 ## Stage B — Fable missions (FABLE_MISSIONS.md) — $100 cap, revised 2026-09-17
-- [ ] M1 Statistical red team ($15) → Opus wires handoff → Daniel re-runs → `make diagnostics`
+- [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [ ] M2a Model research: diagnose + build ($20) → Daniel full backtests
 - [ ] M2b Judge + iterate ($20) → Daniel full backtests
 - [ ] M2c Correlated stages / sampler geometry, lock config + `make holdout` ($15) → Opus wires → `make project diagnostics`
@@ -27,6 +27,14 @@
 |---|---|---|---|
 
 ## Next command(s) for Daniel
+- **After Fable M1 (2026-09-17):** re-run the dev backtests so the gates reflect park-aware scoring
+  (both runs, so tier2 and tier3 rows stay comparable — ~50 min each):
+  - `make backtest`
+  - `make backtest TIER=3`
+  - `make diagnostics`
+  - paste the printed RMSE table + gates back into a Fable session ("Results of `make backtest`: …").
+    M1's pre-registered prediction (in M1_audit.md): H/hr RMSE → ~.0135, H/hr cov80 → ~.80,
+    pitcher rows ~unchanged. Still do NOT run `make holdout`.
 - **Smoke-test P5** (one terminal per line, no long job):
   - `make api` — FastAPI on :8000 against `data/artifacts/`.
   - `make web` — Vite dev server on :5173 (first run does `npm install`).
@@ -42,6 +50,24 @@
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M1 statistical red team — Fable (2026-09-17)
+Full findings: `docs/fable/M1_audit.md`. One root cause fixed, four findings for M2, rest clean.
+- **F1 (fixed): backtest scored Tier 2 park-neutral against in-park actuals — a handicap Marcel
+  doesn't carry.** Explains H/hr being the worst stat AND the H-vs-P asymmetry (park_sd .35 vs .12).
+  Fix: park-aware scoring via T-1 venue shares (leakage-safe), default on, `--park-neutral` opt-out,
+  recorded in backtest.json. Pre-registered quick validation (identical fits, 2024 H): tier2
+  stage_hr RMSE .0202 → .0172 (Marcel .0169); stage_k unchanged. Tests +2 (31 pass).
+- **F2: Q1(b) refuted.** Observed H/hr talent sd among regulars .541 ≈ model √(sigma_pop²+park²)
+  .509 — no over-shrinkage from the part-timer-heavy fit population. M2a shouldn't spend a change there.
+- **F3: Marcel wOBA bias +.0085 is uniform across ages** → stale environment + selection, shared by
+  tier2's 3-yr mean mu_proj (2020 equal-weighted). M2a menu: league environment projection.
+- **F4: BB% loss cause hypothesis** — tau .135/.123 for bb/k (stablest skills) looks inflated,
+  making tier2 over-weight T-1; candidate M2a change: age/PA-dependent or heavy-tailed innovations.
+- **F5: H/hit_bip funnel cause** — tau .017 ⇒ per-player states collapse; per-element non-centring
+  can't absorb the cumulative-sum degeneracy. M2c reparameterisation target.
+- Clean: leakage (incl. new exposure path), stage math, ages, traded/two-way, 2020, Marcel fidelity.
+- Fable self-estimate: ~$5 (input ~150k, output ~15k).
 
 ### P1 data layer — full `make data` (Daniel, 2026-09-17)
 - fetch 2015–2026 OK. Per-season H/P/bios counts all present; traded-player splits pulled.
@@ -335,6 +361,8 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6.5: diagnostics is artifact-consuming only (no model fits) so it stays cheap and re-runnable after every Fable handoff. Every file listed in FABLE_MISSIONS.md §3 is emitted; columns that need per-player Tier 2/3 posteriors are left null and the CONTEXT.md "gaps" section names the one HANDOFF item (`backtest_predictions.parquet` + `backtest_posteriors.parquet` from backtest.py) that unlocks them. Chosen over re-fitting because a full backtest is a Daniel job.
 - 2026-09-17 — P6.5: pit_histograms.csv uses a normal-approx PIT (Φ((actual − pred) / RMSE_scale)) pooled across dev targets for Marcel. Called out in the CSV's `note` column and in CONTEXT.md; real posterior-predictive PIT for Tier 2/3 lands after the sidecar exists.
 - 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
+
+- 2026-09-17 — M1: backtest scores Tier 2/3 park stages in the player's T-1 park (park-aware) by default — park-neutral scoring handicapped only Tier 2 vs a park-inheriting Marcel; `--park-neutral` preserves the old behaviour; gates re-decided by Daniel's re-run, not edited by hand.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

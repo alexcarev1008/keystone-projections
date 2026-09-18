@@ -219,6 +219,20 @@ def _stage_long(train: Bundle, role: str, window: tuple[int, int]) -> pd.DataFra
 RHAT_WARN = 1.05
 
 
+def park_exposure_map(exposures: pd.DataFrame | None, window_end: int) -> dict:
+    """Expected target-season park exposure = the player's T-1 (window_end) home-venue shares.
+
+    Leakage-safe: season-T teams are not known at projection time in a backtest, so the last
+    observed season stands in for them. Players with no T-1 row project park-neutral.
+    Returns {mlbam_id: {venue_id: 0.5 * share}} in the form SS.project expects.
+    """
+    if exposures is None or exposures.empty:
+        return {}
+    e = exposures[exposures.season == window_end]
+    return {int(p): {int(v): 0.5 * float(s) for v, s in zip(g.venue_id, g.share)}
+            for p, g in e.groupby("mlbam_id")}
+
+
 def _diagnostics(idata) -> dict:
     """Sampler health on the population parameters. r_hat needs >= 2 chains; it is None below that."""
     names = [v for v in ("tau", "sigma_pop", "lam", "sigma_age", "g0", "park_sd")
@@ -236,11 +250,15 @@ def _diagnostics(idata) -> dict:
 
 
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
-                    indicator: pd.DataFrame | None = None, seed: int = 1):
+                    indicator: pd.DataFrame | None = None, seed: int = 1,
+                    park_aware: bool = True):
     """Fit one stage on the 6-season window ending at target-1.
 
     Returns (ids, draws, diagnostics) where draws is (n_players, n_draws): the h=1 talent
-    probability for the target season, park-neutral.
+    probability for the target season. Park stages project into the player's T-1 park
+    (park_aware=True, the default): Marcel inherits each player's park implicitly through his
+    raw rates, so a park-neutral Tier 2 would be scored against park-inflected actuals with a
+    handicap Marcel does not carry. park_aware=False restores the neutral projection.
     """
     window_end = target - 1
     window = (window_end - C.WINDOW_LEN + 1, window_end)
@@ -266,8 +284,9 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
                    **sampling)
     diag = _diagnostics(idata)
     mu_proj = LG.projection_logit(train.lg[role], stage, window_end)
+    exposure = park_exposure_map(exposures, window_end) if (park_aware and use_park) else None
     players, P = SS.project(idata, d, horizons=1, mu_proj=mu_proj,
-                            rng=np.random.default_rng(seed))
+                            rng=np.random.default_rng(seed), park_exposure=exposure)
     ids, draws = players.mlbam_id.to_numpy(), np.ascontiguousarray(P[:, 0, :])
     del idata, model, d, P
     gc.collect()
@@ -275,12 +294,12 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
 
 
 def tier_draws(train: Bundle, role: str, target: int, stages: list[str], sampling: dict,
-               indicators: dict | None = None, seed: int = 1):
+               indicators: dict | None = None, seed: int = 1, park_aware: bool = True):
     """Fit stages one at a time (memory — MANUAL §12) and align them on one player index."""
     raw, diags, ids_common = {}, {}, None
     for stage in stages:
         ids, draws, diag = fit_stage_draws(train, role, stage, target, sampling,
-                                           (indicators or {}).get(stage), seed)
+                                           (indicators or {}).get(stage), seed, park_aware)
         raw[stage] = (ids, draws)
         diags[stage] = diag
         ids_common = pd.Index(ids) if ids_common is None else ids_common.intersection(ids)
@@ -354,7 +373,7 @@ def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
 
 
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
-               sampling: dict, seed: int = 1) -> list[dict]:
+               sampling: dict, seed: int = 1, park_aware: bool = True) -> list[dict]:
     train = train_slice(b, target)
     env = scoring_env(b, role, target)
     ids = eval_population(b, role, target)
@@ -397,7 +416,7 @@ def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
         print(f"  [warn] tier 3 requested for {role} but no Statcast indicator on disk for any of "
               f"{stages} — running Tier 2 fits (labelled tier3)")
     ss_ids, P, diags = tier_draws(train, role, target, stages, sampling,
-                                  indicators=indicators, seed=seed)
+                                  indicators=indicators, seed=seed, park_aware=park_aware)
 
     if set(stages) == set(ROLE_STAGES[role]):
         score(tier_name, pd.DataFrame({st: P[st].mean(axis=1) for st in P}, index=ss_ids),
@@ -505,9 +524,10 @@ def _json_safe(o):
 
 
 def write_json(path: Path, rows: list[dict], targets: list[int], gates: dict, production: dict,
-               holdout_target: int | None) -> dict:
+               holdout_target: int | None, park_aware: bool = True) -> dict:
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "targets": sorted(targets), "holdout_target": holdout_target,
+               "park_aware_scoring": park_aware,
                "rows": rows, "gates": gates, "production_tier": production}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=1, default=_json_safe))
@@ -526,7 +546,8 @@ def _merge_rows(old: list[dict], new: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------- entry point
 
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
-        out: Path | None = None, holdout: bool = False, seed: int = 1) -> dict:
+        out: Path | None = None, holdout: bool = False, seed: int = 1,
+        park_aware: bool = True) -> dict:
     mode = "quick" if quick else "dev"
     sampling = SAMPLING[mode]
     if quick:
@@ -541,14 +562,15 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
 
     b = load_bundle()
     print(f"[backtest] mode={mode} tier={tier} targets={targets} roles={roles} "
-          f"sampling={sampling} -> {out.name}")
+          f"sampling={sampling} park_aware={park_aware} -> {out.name}")
 
     new_rows: list[dict] = []
     for target in targets:
         for role in roles:
             st = list(stages) if stages else list(ROLE_STAGES[role])
             print(f"[backtest] target {target} role {role} stages {st}")
-            new_rows += run_target(b, role, target, tier, st, sampling, seed=seed)
+            new_rows += run_target(b, role, target, tier, st, sampling, seed=seed,
+                                   park_aware=park_aware)
 
     old = json.loads(out.read_text()) if out.exists() else {}
     rows = _merge_rows(old.get("rows", []), new_rows)
@@ -558,5 +580,5 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     holdout_target = C.HOLDOUT_TARGET if holdout else old.get("holdout_target")
 
     print_summary(new_rows, gates, production, targets)
-    payload = write_json(out, rows, all_targets, gates, production, holdout_target)
+    payload = write_json(out, rows, all_targets, gates, production, holdout_target, park_aware)
     return payload
