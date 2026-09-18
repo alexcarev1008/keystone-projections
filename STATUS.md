@@ -8,15 +8,16 @@
 - [x] P4 API
 - [x] P5 Frontend (agent build; Daniel: `make api` + `make web` + save screenshots)
 - [x] P6 Statcast data + Tier 3 plumbing
-- [ ] P6.5 Fable context pack (`make diagnostics`)
+- [x] P6.5 Fable context pack (`make diagnostics`)
 
-## Stage B — Fable missions (FABLE_MISSIONS.md)
+## Stage B — Fable missions (FABLE_MISSIONS.md) — $100 cap, revised 2026-09-17
 - [ ] M1 Statistical red team ($15) → Opus wires handoff → Daniel re-runs → `make diagnostics`
-- [ ] M2a Model research: diagnose + build ($22) → Daniel full backtests
-- [ ] M2b Judge + iterate + holdout ($18) → Opus wires → `make project diagnostics`
-- [ ] M3 Playing time + attrition ($15, first to cut) → Opus wires
-- [ ] M4 Research memo ($20) → Opus: Methodology page + README (P7) → screenshots
-- [ ] M5 Hiring-manager review + interview prep ($10) → Opus fixes
+- [ ] M2a Model research: diagnose + build ($20) → Daniel full backtests
+- [ ] M2b Judge + iterate ($20) → Daniel full backtests
+- [ ] M2c Correlated stages / sampler geometry, lock config + `make holdout` ($15) → Opus wires → `make project diagnostics`
+- [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
+- [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
+- Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -35,12 +36,9 @@
     (Marcel / Tier 2 / Tier 3 RMSE, cov80, gates).
   - Save four screenshots to `docs/screenshots/`: Home, one hitter (e.g. Judge 592450),
     one pitcher (e.g. Skubal 669373), Ohtani (660271), Methodology.
-- Next Opus session: **P6.5** (Fable context pack). CONTEXT.md leads with the three open
-  findings from Phase 2 + the M1 note:
-  (1) hitter HR% (Tier 2 .0155 vs Marcel .0124, cov80 .71),
-  (2) H/hit_bip divergence concentration (181 of 313),
-  (3) park-neutral scoring question in the M1 notes below.
-- Backlog long jobs: none (P6 Statcast + Tier 3 backtest are DONE — see P6 Tier 3 result below).
+- P6.5 done (agent-only, no long compute); the context pack is at `docs/fable_context/`.
+  Ready to launch **Fable M1** with the kickoff prompt in `FABLE_MISSIONS.md` §5.
+- Backlog long jobs: none.
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
@@ -204,6 +202,38 @@ Vite 8 + React 19 + react-router-dom 7 + recharts 3, TypeScript strict. Structur
 - `npm run build` → 0 TS errors, 609 modules, 671 kB bundle (recharts dominates; single-page
   app so code-splitting is not worth the complexity here).
 
+### P6.5 Fable context pack — agent (2026-09-17, `make diagnostics`, ~10 s)
+`backend/keystone/diagnostics.py` + `pipeline.py diagnostics` write `docs/fable_context/`.
+Consumes only what is on disk (backtest.json, meta.json, aging.parquet, processed/*); no model
+fits, so it is safe to re-run any time. Files written (row counts in parentheses):
+- `CONTEXT.md` (143 lines, cap 400): one-page project brief with the three open findings from
+  Phase 2 + the M1 questions leading, model equations from §5, data coverage per season, gate
+  results, per-stage population parameters from meta.json, and a "gaps" section spelling out the
+  sidecar (`backtest_predictions.parquet`, `backtest_posteriors.parquet`) Fable can request via
+  HANDOFF to unlock per-player Tier 2/3 rows.
+- `code_map.md`: one line per backend file (purpose + public names).
+- `backtest_summary.csv` (200): backtest.json rows without the diagnostics sentinels.
+- `posterior_summaries.csv` (108): meta.json stages (target=window_end) + backtest per-target
+  diagnostics rows (max_rhat/divergences). tau/sigma_pop/lam/sigma_age null per target — that
+  needs the posteriors sidecar.
+- `aging_curves.csv` (462): mean G(age) per role×stage from aging.parquet; q10/q90 null.
+- `park_effects.csv` (16): top/bottom 3 hr parks per role from meta.json; other park stages get a
+  summary row (phi_mean null).
+- `residuals_by_bucket.csv` (1,375): PA-weighted n/mean_error/RMSE per Marcel row bucketed by age
+  (<=24 / 25-27 / 28-30 / 31-33 / >=34), prior PA (<150 / 150-400 / >400), and history length
+  (1 / 2 / 3+). Tier 2/3 rows absent (need per-player sidecar).
+- `pit_histograms.csv` (100): pooled Marcel residual PIT via a normal approx (scale = per-role
+  PA-weighted RMSE across dev targets). Real PP-PIT for Tier 2/3 needs the sidecar.
+- `biggest_misses.csv` (320): 40 largest |wOBA/FIP error| per (role, dev target) for Marcel with
+  name/age/prior_pa/pred/actual.
+- `stage_correlations.csv` (74): observed residual (rate − season league rate) across the last
+  window per player, PA-weighted, correlated between stages within role — a proxy for talent
+  correlation that Fable M2c can compare with an eventual posterior version.
+- `pt_summary.csv` (26): Marcel PT vs actual PA/IP by age×prior-PT bucket for target=2025 (the
+  last complete season); includes share_zero_actual per bucket.
+Acceptance: every file exists ✓, CONTEXT.md 143/400 lines ✓, every CSV under the 2,000-row cap ✓,
+`make test` 29/29 ✓.
+
 ### P6 Tier 3 backtest — `make backtest TIER=3` (Daniel, 2026-09-17)
 - Runs 3 mapped stages (H/hr, H/hit_bip, P/hr) with the Statcast indicator likelihood at
   target_accept 0.95; other stages stay Tier 2 within the same run. Rows merged into
@@ -272,6 +302,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - Holdout 2025: **unspent**, deliberately (see Decisions).
 
 ## Decisions (one line each: date — decision — why)
+- 2026-09-17 — Fable budget re-split: cut the research-memo and hiring-manager-review missions (writing and judgement Daniel/Opus can do), moved the $30 into model research (M2 now 3 sessions, $55), playing time ($20) and a new ML-challenger mission ($10) — Fable is reserved for modelling and statistics only.
 - 2026-09-17 — Reference model verified on simulated data (0 divergences, 80% coverage 0.83) — MANUAL §5.3
 - 2026-09-17 — Opus builds all phases; Fable is reserved for M1–M5 research missions — FABLE_MISSIONS.md §1
 - 2026-09-17 — P1: season totals use bulk /stats (no teamId); per-team splits pulled from /people/{id}/stats only for numTeams>1 — the teamId-filtered /stats undercounts (Chisholm 2024: 191 PA only, missed 430 MIA); MANUAL §4.1 now updated to match.
@@ -301,6 +332,9 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P5: FanChart draws range areas via Recharts `Area dataKey="band80"` with `[q10, q90]` tuples (Recharts renders two-element arrays as ranges). History dots sized by PA (2.5–6 px radius). Vertical divider at `window_end + 0.5` so it sits between window_end and h=1.
 - 2026-09-17 — P5: Vite proxy `/api → http://127.0.0.1:8000` (§9); CORS on the API is already set to `http://localhost:5173`. No `.env` file — the proxy target is hard-coded because the API always runs on that port locally per the Makefile.
 - 2026-09-17 — P6 Tier 3 gate: FAILS for both roles (0/4 wins vs Tier 2 on the key stat). `production_tier` stays `marcel` for H and P — same Marcel-points-with-Tier-2-bands shipping mode as after Phase 2. Recorded as measured, no tuning; the delta is a Fable M2 research finding, not a bug.
+- 2026-09-17 — P6.5: diagnostics is artifact-consuming only (no model fits) so it stays cheap and re-runnable after every Fable handoff. Every file listed in FABLE_MISSIONS.md §3 is emitted; columns that need per-player Tier 2/3 posteriors are left null and the CONTEXT.md "gaps" section names the one HANDOFF item (`backtest_predictions.parquet` + `backtest_posteriors.parquet` from backtest.py) that unlocks them. Chosen over re-fitting because a full backtest is a Daniel job.
+- 2026-09-17 — P6.5: pit_histograms.csv uses a normal-approx PIT (Φ((actual − pred) / RMSE_scale)) pooled across dev targets for Marcel. Called out in the CSV's `note` column and in CONTEXT.md; real posterior-predictive PIT for Tier 2/3 lands after the sidecar exists.
+- 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

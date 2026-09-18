@@ -81,6 +81,14 @@ def cmd_statcast(args: argparse.Namespace) -> None:
     print("[statcast] done")
 
 
+def cmd_diagnostics(args: argparse.Namespace) -> None:
+    """Phase 6.5: write the Fable context pack from what's on disk (no model fits)."""
+    from keystone import diagnostics as diag
+
+    C.ensure_dirs()
+    diag.run(out=args.out)
+
+
 def cmd_holdout(args: argparse.Namespace) -> None:
     """The 2025 holdout: allowed exactly once, and only after the gates are on disk."""
     from keystone.eval import backtest as bt
@@ -142,6 +150,11 @@ def main(argv: list[str] | None = None) -> None:
     sc.add_argument("--start", type=int, default=C.SEASON_START)
     sc.add_argument("--end", type=int, default=C.SEASON_END)
     sc.set_defaults(func=cmd_statcast)
+
+    dg = sub.add_parser("diagnostics", help="write the Fable context pack (Phase 6.5)")
+    dg.add_argument("--out", type=lambda s: __import__("pathlib").Path(s),
+                    default=C.REPO_ROOT / "docs" / "fable_context")
+    dg.set_defaults(func=cmd_diagnostics)
 
     h = sub.add_parser("holdout", help="score the held-out season once (§6)")
     h.add_argument("--target", type=int, default=C.HOLDOUT_TARGET)

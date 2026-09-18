@@ -30,22 +30,23 @@ STAGE A — Opus builds (MANUAL.md §10)       $0 Fable
 STAGE B — Fable missions (this file)          $100 Fable
   M1 Statistical red team ($15)
      └─ Opus wires the handoff · Daniel re-runs backtests · Opus refreshes the context pack
-  M2a Model research: diagnose + build ($22)
+  M2a Model research: diagnose + build ($20)
      └─ Daniel runs full backtests
-  M2b Model research: judge + second iteration ($18)
+  M2b Model research: judge + second iteration ($20)
+     └─ Daniel runs full backtests
+  M2c Model research: correlated stages / sampler geometry, lock the configuration + holdout ($15)
      └─ Opus wires the handoff · Daniel runs `make project` · Opus refreshes the context pack
-  M3 Playing time + attrition model ($15)
+  M3 Playing time + attrition model ($20)
      └─ Opus wires it into artifacts/API/UI · Daniel re-runs
-  M4 Research memo + "what the model learned" ($20)
-     └─ Opus builds the Methodology page + README from the memo (Phase 7) · Daniel takes screenshots
-  M5 Hiring-manager review + interview prep ($10)
-     └─ Opus fixes the listed issues
+  M4 ML challenger + formal model comparison ($10)
+     └─ Opus wires whatever ships · Opus writes the research memo and README (Phase 7) from the context pack
+  (Daniel reviews the screenshots and the finished app himself; Opus drafts the memo — no Fable budget for either.)
 STAGE C — Opus final polish                    $0 Fable
 ```
 
 **Budget ledger:** after every Fable session, Daniel writes the spend in STATUS.md → "Fable ledger". Rules:
 - If a mission reaches **its budget + 30%**, Fable stops and writes the handoff.
-- If M1 + M2 together go over $65, **skip M3** (move "playing-time model" to the README's "What I'd do next").
+- If M1 + M2 together go over $95, **skip M3** (move "playing-time model" to the README's "What I'd do next").
 - The $10 reserve is only for fixing a mistake Fable made itself.
 
 ## §3 Context pack (built by Opus in Phase 6.5, refreshed after every handoff)
@@ -99,7 +100,7 @@ open only the code you need (expected: `components.py`, `league.py`, `models/*`,
 **Deliverable:** `docs/fable/M1_audit.md` — findings ranked by impact on the conclusions (severity, evidence, fix,
 status). ✔ `make test` passes. The re-run commands are in STATUS.md.
 
-## M2 — Model research (two sessions: M2a $22, M2b $18)
+## M2 — Model research (three sessions: M2a $20, M2b $20, M2c $15)
 
 **Why Fable:** open-ended, multi-step research with judgment calls — which failure matters, which fix is principled,
 when to stop. This is the part of the project a projections team actually evaluates.
@@ -107,28 +108,37 @@ when to stop. This is the part of the project a projections team actually evalua
 **Goal:** a production model that beats Marcel on wOBA (H) and FIP (P) in ≥ 3 of 4 dev targets, with 80% coverage
 in [0.75, 0.85] — and a documented story of *why* each change helped or didn't.
 
+**Known state going in** (from the Stage A backtests, see STATUS.md):
+- Tier 2 loses to Marcel on the key stats; hitter HR% is the worst stat (.0155 vs .0124, cov80 .71) and carries the
+  largest wOBA weight. Tier 2 wins where shrinkage is the whole job: K%, BABIP (both roles), pitcher HR%.
+- Tier 3 (barrels/BBE, ev95plus) is fitted; its gate result is in `backtest.json`. Sampling got far cleaner with the
+  indicator (H/hit_bip divergences 181 → ~1 per target), which is itself a finding about the Tier 2 geometry.
+- Sampling is still not clean: several fits above r_hat 1.05, worst H/triple ≈ 1.23.
+
 **M2a — diagnose + build. Read:** refreshed context pack (after M1), M1_audit.md, `models/state_space.py`, `eval/backtest.py`.
-1. Write a diagnosis: where and why the current production tier loses to Marcel or is miscalibrated (by stage, age, PA, history length).
-2. Rank candidate upgrades by (expected gain × confidence) ÷ complexity. Fable decides; the menu is only a starting point:
-   - Statcast indicators (Tier 3) for more stages (whiff/chase-type indicators, if the Phase 6 data supports them)
-   - correlated talent across stages (a multivariate random walk, or a shared latent factor)
-   - heavy-tailed talent innovations (real breakouts and collapses)
-   - innovation scale and prior mean that depend on age or on PA (not only in the first season)
-   - pitcher role effects (starter vs reliever)
-   - a better league-environment projection than a 3-year mean
+1. Write a diagnosis: where and why the production tier loses to Marcel or is miscalibrated (by stage, age, PA, history length).
+2. Rank candidate upgrades by (expected gain × confidence) ÷ complexity. Fable decides; the menu is a starting point:
+   park-aware scoring; a fitting population that isn't dominated by part-timers; heavy-tailed talent innovations;
+   age- or PA-dependent innovation scale; more Statcast indicators; pitcher role (SP/RP) effects; a better
+   league-environment projection than a 3-year mean.
 3. Implement **up to 3** upgrades behind flags, each with a pre-registered hypothesis in
    `docs/fable/M2_experiments.md`, each validated with `--quick`. Put the full-run commands in STATUS.md and stop.
 
 **M2b — judge + iterate. Read:** Daniel's pasted results, M2_experiments.md.
 1. Accept or reject each experiment against its pre-registered metric (the §6 gates). No moving the goalposts.
-2. One more iteration (at most 2 changes) if the evidence points somewhere clear; otherwise lock in the production configuration.
-3. Once the configuration is locked: `make holdout` (Daniel) → record the 2025 result honestly, good or bad.
-4. HANDOFF: everything Opus needs to carry the chosen configuration into artifacts, the waterfall steps, the API and the UI.
+2. One more round of at most 2 changes where the evidence points somewhere clear.
+
+**M2c — correlated stages, sampler geometry, lock in. Read:** the M2b results.
+1. Attempt the structural upgrade the earlier sessions couldn't fit into a single change: correlated talent across
+   stages (a multivariate random walk or a shared latent factor), and/or a reparameterisation that fixes the fits
+   still above r_hat 1.05. Both are judged by the same gates — ship only what wins.
+2. Lock the production configuration. Then `make holdout` (Daniel) → record the 2025 result honestly, good or bad.
+3. HANDOFF: everything Opus needs to carry the chosen configuration into artifacts, the waterfall steps, the API and the UI.
 
 **Deliverable:** `docs/fable/M2_experiments.md` (hypothesis → change → result → decision for each experiment, plus
 the final configuration and the holdout result).
 
-## M3 — Playing time + attrition ($15; the first thing cut if over budget)
+## M3 — Playing time + attrition ($20; the first thing cut if over budget)
 
 **Why Fable:** Marcel playing time plus "conditional on playing" is the model's biggest real-world weakness, and a
 club makes free-agent and trade decisions on *expected* production. This needs careful modelling judgment
@@ -142,45 +152,25 @@ playing × production) alongside the conditional ones. HANDOFF: the artifact col
 example, "chance he's still an MLB regular in 2029").
 **Deliverable:** `docs/fable/M3_playing_time.md` + code + tests.
 
-## M4 — Research memo ($20)
+## M4 — ML challenger + formal model comparison ($10)
 
-**Why Fable:** this is the document a Nationals reviewer actually reads. Turning posteriors and backtests into
-correct, persuasive baseball insight is deep analysis plus a finished deliverable — Fable's strongest use.
+**Why Fable:** deciding whether a flexible learner actually beats a structured Bayesian model — and being willing to
+report that it doesn't — is a judgment call, and the comparison has to be statistically honest to be worth anything.
 
-**Read:** the final context pack (refreshed after M2/M3), the M1–M3 documents. Open code only to check a claim.
-**Write** `docs/research_memo.md` (≤ 2,500 words, in Daniel's voice, first person, no hype):
-1. The question and approach, in plain language (1 paragraph).
-2. The model, in words plus equations; why components; why a state-space model.
-3. **What the model learned**, with numbers and honest uncertainty: how fast each stat's talent changes (tau) and
-   what that means for how much recent seasons should count; the pitcher-vs-hitter BABIP talent spread (DIPS);
-   component aging curves (which skills peak early, which decline late); park effects (does the model recover the
-   parks everyone knows?); the playing-time finding.
-4. Validation: vs Marcel, calibration, where it still loses, and the 2025 holdout.
-5. Three case studies from the 2027 projections: a player the model likes more than his surface stats suggest, a
-   regression candidate, and **one current Nationals player** — each explained through the waterfall.
-6. Limitations and next steps.
+**Read:** the final context pack, M2_experiments.md, `eval/backtest.py`.
+**Do:**
+1. Build a gradient-boosted challenger for the same target (the derived key stat, or the stage rates): features from
+   the same information set the Bayesian model uses — nothing from season T. Same rolling-origin design, same
+   evaluation population, same weighting. Any hyperparameter choice is made inside the training years only.
+2. Compare on PA-weighted RMSE **and** on distributional scores (CRPS, log score) — a point-only learner has to be
+   given an honest interval method (for example quantile regression or residual-based intervals) or be scored only
+   where a point metric is fair, and the write-up must say which.
+3. Test the obvious hybrid: does the Bayesian projection plus a learned residual correction beat either alone?
+4. Report the verdict plainly, including "the hierarchical model wins and here is why" if that's what the numbers say.
+   Ship the challenger only if it passes the §6 gates.
 
-Also write `docs/fable/methodology_content.json` (section → paragraphs, plus the key numbers) and a HANDOFF item for
-Opus to render it on the Methodology page. ✔ Every number in the memo traces to a file in the context pack; list
-those sources in an appendix table.
-
-## M5 — Hiring-manager review + interview prep ($10)
-
-**Why Fable:** a critical, expert read of the whole thing — including the rendered charts, using vision — from
-the point of view of the person making the hiring decision.
-
-**Read:** `docs/screenshots/*`, `docs/research_memo.md`, `README.md`, CONTEXT.md.
-**Do:** role-play the Nationals' Player Projections lead reviewing this application.
-1. The top 10 weaknesses a reviewer would notice (statistical, baseball, visual/communication), ranked. Fix the
-   memo/README wording yourself; send everything else to HANDOFF.
-2. Check every chart in the screenshots: are the bands, scales, labels and colors honest and readable?
-3. `docs/interview_prep.md`: 20 hard questions a projections team would ask about this project (methodology,
-   baseball, "why not X", failure cases), each with a strong answer grounded in this repo, plus 5 questions Daniel
-   should ask them.
-
-**Deliverable:** `docs/fable/M5_review.md`, `docs/interview_prep.md`.
-
----
+**Deliverable:** `docs/fable/M4_ml_challenger.md` — design, leakage controls, results table, verdict, and the two or
+three sentences the README should say about it. Opus wires anything that ships and writes the research memo itself.
 
 ## §5 Kickoff prompts (paste into a new Fable session)
 
