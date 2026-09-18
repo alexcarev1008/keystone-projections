@@ -311,3 +311,51 @@ make holdout
 ```
 
 Record the 2025 result in this file and STATUS.md exactly as printed, good or bad.
+
+---
+
+## The 2025 holdout (M2c)
+
+### Attempt 1, 2026-09-18 — MISCONFIGURED, ruled invalid
+
+`make holdout` ran at 14:53 local with the pre-handoff pipeline — Daniel's run raced Opus's
+wiring commit (`handoff: M2c`, 14:54) by one minute. The code that executed had no model-config
+flags on the holdout subcommand and no flag-match guard (both were added in the commit that
+landed sixty seconds later), so it scored 2025 with the OLD defaults
+`{env_mode: mean3, obs_noise: false}` — the superseded pre-M2 model, not the locked E5+E6 —
+and then stamped those flags over the promoted `backtest.json` and set `holdout_target: 2025`.
+The canonical file is now a chimera (locked-config dev rows, old-config 2025 rows, flags that
+claim the whole file is old-config); repair is a HANDOFF item.
+
+Result as printed, recorded permanently (old config, 2025, n = 319 H / 325 P):
+
+    H  woba  marcel .0305 | tier2 .0309 (cov80 .81)     P  fip   marcel .7317 | tier2 .7402 (cov80 .75)
+    H  bb    .0197 | .0196    H  hr  .0117 | .0118      P  bb    .0172 | .0185    P  k   .0380 | .0377
+    H  k     .0364 | .0378    H  babip .0327 | .0303    P  hr    .0100 | .0098    P  babip .0336 | .0319
+
+### Ruling: the holdout is NOT spent; one re-run with the locked config is authorised
+
+Reasoning, written before the re-run:
+- The one-shot rule exists to prevent adaptive selection on 2025 — trying configurations and
+  keeping the one that looks best. That opportunity does not arise here: the locked
+  configuration was decided on dev evidence alone and committed (`8ced169`) before any 2025
+  number existed, and the need to re-run follows from the misconfiguration itself, not from
+  the numbers the misfire printed. The run was invalid by construction whatever it said.
+- Declaring the holdout spent would leave the production model permanently unscored on 2025,
+  defeating the holdout's purpose, as a penalty for a one-minute race between two agents.
+- **The leak, stated honestly:** we now know the 2025 Marcel baselines (H .0305, P .7317) and
+  that the *old* tier2 config scored H .0309 / P .7402 with cov80 .81/.75 on 2025. Once the
+  locked config is scored, both configs' 2025 results will be known, which is exactly the
+  comparison the one-shot rule forbids acting on. **Pre-commitments, therefore:** (1) the
+  locked configuration ships regardless of which config looks better on 2025 — the lock was
+  made on dev evidence and is not revisited; (2) no modelling decision of any kind changes on
+  the misfire numbers; (3) the re-run happens once, and the holdout is spent after it,
+  whatever it prints. The dev-side expectation for the legitimate run was already on record in
+  STATUS.md before any 2025 number: H wOBA close to or better than Marcel, P FIP worse than
+  Marcel, cov80 in [.75, .85] for both.
+
+### Attempt 2 (locked config `--obs-noise --env-mode shock`) — pending
+
+Runs after the state repair (HANDOFF): restore canonical `backtest.json` + sidecars from the
+clean E5E6 copies in `m2/`, archive the misfire file. Then `make holdout`, once. Result to be
+recorded here exactly as printed.

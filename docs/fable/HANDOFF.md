@@ -64,6 +64,34 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `model_config: {obs_noise: true, env_mode: "shock"}` and per-stage sigma_obs alongside tau;
   (c) Validation section: coverage now in band for both roles (H .82, P .76), gates still
   Marcel on points, and the M2 story in one paragraph — ✔ `npm run build` passes.
+- [ ] (M2c, URGENT — BEFORE the holdout re-run) repair the canonical state after the
+  misconfigured 2025 holdout (M2_experiments.md §"The 2025 holdout"): the 14:53 run raced the
+  `handoff: M2c` commit and merged old-config (`mean3`/`obs_noise:false`) 2025 rows into the
+  promoted `backtest.json`, stamped its `experiment_flags` over the file, set
+  `holdout_target: 2025`, and appended 2025 rows to both sidecars. Repair: (a) move
+  `data/artifacts/backtest.json` → `data/artifacts/m2/backtest_holdout_2025_misfire.json`
+  (preserve — it is the permanent record of attempt 1); (b) re-copy
+  `m2/backtest_E5E6.json` → `data/artifacts/backtest.json` and `m2/backtest_predictions.parquet`
+  + `m2/backtest_posteriors.parquet` → `data/artifacts/` (the clean E5E6 copies, targets
+  2021–2024 only) — ✔ canonical `backtest.json` has `holdout_target: null`,
+  `experiment_flags: {env_mode: shock, obs_noise: true}`, no 2025 rows; sidecars have no 2025
+  rows; `make diagnostics` green; `make holdout` then runs WITHOUT `--force` and its printed
+  flags header shows the locked config.
+- [ ] (M2c) guard hardening + regression test for the failure that let attempt 1 through —
+  the CLI guard exists but lives only in `cmd_holdout`, so any path that reaches
+  `bt.run(holdout=True)` directly (stale code, a script, a future refactor) can still score a
+  mismatched config and overwrite the dev file's `experiment_flags`. (a) In
+  `backend/keystone/eval/backtest.py` `run()`: when `holdout=True` and `out` exists, read the
+  existing JSON's `experiment_flags`; if they differ from this run's
+  `{env_mode, rp_effect, innov, obs_noise}`, raise `SystemExit` BEFORE fitting anything and
+  before touching the file — the writer must never stamp new flags over a dev file it
+  disagrees with. (b) `tests/`: regression test with a tmp-dir `backtest.json` fixture carrying
+  `experiment_flags: {env_mode: mean3, ..., obs_noise: false}` + recorded gates: calling
+  `run(targets=[2025], holdout=True, out=fixture)` with locked-config defaults raises
+  SystemExit and leaves the fixture byte-unchanged; a second test with matching flags proceeds
+  past the guard (monkeypatch the fitting to a stub). Also test `cmd_holdout` end-to-end via
+  `pipeline.main(["holdout", ...])` on the mismatched fixture → SystemExit — ✔ `make test`
+  green; the new tests fail if either guard is removed.
 - [ ] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
   runs: `run()` writes `backtest_predictions{_quick}.parquet` / `backtest_posteriors{_quick}.parquet`
   into `out.parent`, so consecutive `--out ../data/artifacts/m2/backtest_E*.json` runs overwrite

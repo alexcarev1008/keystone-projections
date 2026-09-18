@@ -31,18 +31,23 @@
 | M2c | $15 | Daniel fills in (Fable self-estimate ~$6: input ~200k, output ~12k) | ~$26 |
 
 ## Next command(s) for Daniel
-- **After Fable M2c (2026-09-18): the holdout, in this order.**
-  1. ~~Opus wires the M2c HANDOFF items~~ DONE 2026-09-18 for the three that block the holdout
-     (locked flags are the default in `backtest`/`holdout`/`project`; E5E6 promoted to
-     `backtest.json`). Item 4 (Methodology + meta.json docs) is still open and doesn't block
-     the holdout. `make holdout` now refuses to run if its flags don't match
-     `backtest.json.experiment_flags`.
-  2. **← next:** `make holdout` — ONCE. (~15 min: one target year, both roles, locked config
-     `--obs-noise --env-mode shock`.)
-  3. Paste the printed 2025 table + gates back into the M2c Fable session ("Results of
-     `make holdout`: …") so the result is recorded in M2_experiments.md and here, honestly,
-     whatever it says. The dev-side expectation, written before the run: H wOBA close to or
-     better than Marcel, P FIP worse than Marcel, cov80 in [.75,.85] for both.
+- **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
+  Daniel's `make holdout` raced the `handoff: M2c` commit (14:54) by one minute and ran the
+  pre-wiring code: no flags, no guard → it scored 2025 with the OLD config (`mean3`,
+  `obs_noise: false`) and corrupted canonical `backtest.json` (old flags stamped over the
+  promoted E5E6 file, `holdout_target: 2025` latched, old-config 2025 rows merged into file +
+  sidecars). Full record + ruling + pre-commitments: `M2_experiments.md` §"The 2025 holdout".
+  One re-run with the locked config is authorised (config was locked and committed before any
+  2025 number existed; no modelling decision changes on the misfire numbers). In order:
+  1. **Opus:** the two new URGENT M2c HANDOFF items — state repair (restore canonical from the
+     clean E5E6 copies in `m2/`, archive the misfire file) and the writer-level guard +
+     regression test.
+  2. **Daniel:** `make holdout` — the authorised re-run, ONCE, no `--force` needed after the
+     repair. Verify the printed flags header says `env_mode: shock, obs_noise: True` before
+     letting it proceed past the first line. After this run the holdout is spent for good.
+  3. Paste the printed 2025 table back into the M2c Fable session. Pre-registered expectation
+     (on record before any 2025 number): H wOBA close to or better than Marcel, P FIP worse
+     than Marcel, cov80 in [.75,.85] for both.
   4. `make project` (~35 min) then `make diagnostics` (~10 s) — production artifacts + context
      pack under the locked config.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
@@ -102,6 +107,18 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### 2025 holdout attempt 1 — MISFIRE (Daniel, 2026-09-18 14:53, ruled invalid by Fable M2c)
+Ran the pre-handoff code (raced the wiring commit by 1 min): old config `mean3`/no obs-noise,
+NOT the locked E5+E6. Recorded permanently, decides nothing (old config, n=319 H / 325 P):
+H wOBA marcel .0305 / tier2 .0309 (cov80 .81) · P FIP marcel .7317 / tier2 .7402 (cov80 .75).
+Ruling: holdout NOT spent — the locked config was committed before any 2025 number existed and
+the re-run obligation follows from the misconfiguration, not the numbers. Pre-commitments in
+M2_experiments.md §"The 2025 holdout": locked config ships regardless of the old-vs-new 2025
+comparison; one re-run only; spent after it whatever it says. State repair + writer-level
+guard + regression test filed as URGENT HANDOFF items (canonical backtest.json is currently a
+chimera — E5E6 dev rows, old-config 2025 rows, old flags, latched holdout_target — and must be
+restored from the m2/ E5E6 copies before the re-run).
 
 ### M2c handoff wire-up — Opus (2026-09-18, code + file copy, no long compute)
 Ticked the first three M2c items in `docs/fable/HANDOFF.md`. Item 4 (Methodology + meta.json
@@ -572,6 +589,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-18 — M2c wiring: the locked config (obs-noise + env shock) is the default everywhere (`backtest.py` functions, the `backtest`/`holdout`/`project` CLIs, `project.py`) with opt-outs back to the pre-M2 model; `project` offers only shock/mean3 because recency was rejected.
 - 2026-09-18 — M2c wiring: `holdout` refuses to run unless its flags match `backtest.json.experiment_flags`. The holdout is one-shot, and a mismatch means scoring a model the gates weren't decided on (which the unwired holdout would have done).
 - 2026-09-18 — M2c promotion: the superseded post-M1 baseline backtest (JSON + untracked sidecars, incl. the pre-M2 tier3 rows) is archived under `data/artifacts/m2/backtest_base*` rather than discarded, because the M2 verdicts cite its numbers.
+- 2026-09-18 — M2c holdout ruling: attempt 1 (14:53) scored the superseded config because the run raced the wiring commit — ruled invalid, holdout NOT spent; one locked-config re-run authorised with pre-commitments recorded (config ships regardless of the now-leaked old-vs-new 2025 comparison; no modelling decision changes on the misfire numbers; spent after the re-run whatever it says).
 - 2026-09-18 — M2c: production configuration locked = tier2 `--obs-noise --env-mode shock` (the `backtest_E5E6.json` run, seed 1) — E5 and E6 passed every pre-registered sub-check; E3 rejected (core sub-check unverifiable + r_hat 1.363 + gain subsumed by E5); `--innov t4` declined (relabelling reappears under obs-noise, no geometry win); correlated stages declined with reasons (weak observed corr, binding losses are regime errors, rebuild cost). Gates still FAIL → Marcel points + Tier 2 bands; holdout runs the locked config after Opus wires the flags.
 - 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.
 - 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.
