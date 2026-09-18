@@ -12,7 +12,7 @@
 
 ## Stage B — Fable missions (FABLE_MISSIONS.md) — $100 cap, revised 2026-09-17
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
-- [ ] M2a Model research: diagnose + build ($20) → Daniel full backtests
+- [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [ ] M2b Judge + iterate ($20) → Daniel full backtests
 - [ ] M2c Correlated stages / sampler geometry, lock config + `make holdout` ($15) → Opus wires → `make project diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
@@ -25,9 +25,24 @@
 ## Fable ledger (Daniel fills in after every Fable session)
 | session | budget | actual | running total (cap $100, reserve $10) |
 |---|---|---|---|
+| M1 | $15 | ~$5 (Fable self-estimate) | ~$5 |
+| M2a | $20 | Daniel fills in (Fable self-estimate ~$8: input ~250k, output ~20k) | ~$13 |
 
 ## Next command(s) for Daniel
-- **After Fable M1 (2026-09-17):** re-run the dev backtests so the gates reflect park-aware scoring
+- **After Fable M2a (2026-09-17): run the three experiment backtests.** Each writes its own JSON +
+  sidecars under `data/artifacts/m2/` — `backtest.json`, the gates and the production tier are
+  untouched until M2b accepts something. From the repo root (~50 + ~25 + ~60 min):
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --env-mode recency --out ../data/artifacts/m2/backtest_E2.json`
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --rp-effect --roles P --out ../data/artifacts/m2/backtest_E3.json`
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --innov t4 --out ../data/artifacts/m2/backtest_E4.json`
+  - then `make diagnostics` (10 s — this also refreshes the context pack from the post-M1 sidecars;
+    the current pack's Tier 2 CSV rows are stale because diagnostics ran before the M1 re-run).
+  - paste each printed RMSE table + gates into a fresh Fable session ("Results of `<command>`: …")
+    to start **M2b**. The pre-registered accept/reject rules are in `docs/fable/M2_experiments.md`
+    — M2b judges against those, no goalpost moves. Still do NOT run `make holdout`.
+- **After Fable M1 (2026-09-17):** ~~re-run the dev backtests~~ DONE 2026-09-17 (results below,
+  M1's park-aware prediction confirmed: H/hr .0155 → .0128, H wOBA .0364 → .0333, gates still
+  marcel for both roles but H is now 2/4 with cov80 .78 ✓). Original instructions kept for the record:
   (both runs, so tier2 and tier3 rows stay comparable — ~50 min each). Opus wired the M1
   sidecars 2026-09-17 (see Results below), so the re-run also writes
   `backtest_predictions.parquet` + `backtest_posteriors.parquet` next to `backtest.json`, which
@@ -55,6 +70,29 @@
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M2a diagnose + build — Fable (2026-09-17)
+Full diagnosis + pre-registrations: `docs/fable/M2_experiments.md`. Post-M1 state: H wOBA tied
+(.0333 vs .0334, 2/4 wins, cov80 .78 ✓ — needs one flip of 2021 gap .0005 / 2023 gap .0023);
+P FIP loses (.8223 vs .7947, 1/4, cov80 .73 ✗). Three causes found, three upgrades shipped
+behind default-off backtest flags, each quick-validated against its pre-registration:
+- **Environment lag.** FIP bias marcel/tier2: 2021 +.15/+.21, 2022 +.28/+.39, 2023 −.18/−.02,
+  2024 +.09/+.14 — 2022 (dead ball) is mostly bias; tier2's 1/1/1 3-yr mean mu_proj lags trends
+  worse than Marcel's 5/4/3 rates (tier2 over-projects H k_pct and P bb_pct in all 4 targets).
+  FIP cov80 .73 = zero environment uncertainty in the draws (a common error RMSE-weighting feels).
+  → **E2 `--env-mode recency`**: recency×size-weighted league forecast + common env shock per
+  draw. Quick: fits identical, stage_k .0341→.0339, hr unchanged ✓.
+- **RP pooling.** P FIP by T-role: tier2 loses relievers in 4/4 targets (RMSE .85/1.12/.91/.92
+  vs Marcel .81/1.01/.83/.84) while winning/tying SP 3/4 — shrinkage drags RPs toward an
+  SP-dominated mix. → **E3 `--rp-effect`**: centred rp_share covariate (1−GS/G), T-1 role
+  projected forward. Quick: delta_role k +.141 (sd .015), hr −.137 (sd .021), RMSE ok ✓.
+- **T-1 chasing (M1-F4 confirmed).** corr(T-1 dev, error) tier2 +.04..+.10 vs Marcel −.05 on
+  k/bb; Gaussian innovations force one scale, inflating tau on the stablest skills.
+  → **E4 `--innov t4`**: Student-t(4) transitions (first-season Normal, latent dim unchanged,
+  projection noise matched). Quick: tau H/k .124→.092, RMSE within noise, geometry fine ✓.
+Tests 35/35 pass (4 new in `tests/test_m2a_experiments.py`). Full-run commands above; M2b
+judges each against `M2_experiments.md` — the pre-registered expectations are written down,
+no goalpost moves. Fable self-estimate: ~$8 (input ~250k, output ~20k).
 
 ### M1 handoff wire-up — Opus (2026-09-17, code only, no long compute)
 Ticked items 1, 2, 4 in `docs/fable/HANDOFF.md`; item 3 deferred (see below).
@@ -415,6 +453,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
 
 - 2026-09-17 — M1: backtest scores Tier 2/3 park stages in the player's T-1 park (park-aware) by default — park-neutral scoring handicapped only Tier 2 vs a park-inheriting Marcel; `--park-neutral` preserves the old behaviour; gates re-decided by Daniel's re-run, not edited by hand.
+- 2026-09-17 — M2a: three upgrades behind backtest flags, all default-off, pre-registered in `docs/fable/M2_experiments.md` before any run — E2 `--env-mode recency` (recency+size-weighted league forecast + common env shock in projection draws), E3 `--rp-effect` (SP/RP covariate on P stages, T-1 role projected forward), E4 `--innov t4` (Student-t(4) talent innovations, nu fixed, projection noise matched). Full runs write to `data/artifacts/m2/` so `backtest.json` and the gates stay untouched until M2b accepts; production `project.py` wiring is a HANDOFF item gated on M2b.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

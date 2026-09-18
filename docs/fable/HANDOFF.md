@@ -26,4 +26,12 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   scoring is park-aware as of M1 (Tier 2/3 projections evaluated in the player's last-season park,
   matching the park information Marcel carries implicitly); note `backtest.json.park_aware_scoring`
   — ✔ `npm run build` passes.
+- [ ] (M2a, BLOCKED until M2b accepts/rejects each experiment) `backend/keystone/project.py` —
+  thread whichever of the three M2a flags M2b accepts into the production pipeline, mirroring
+  `eval/backtest.fit_stage_draws`: `env_mode="recency"` → use `LG.projection_logit_recency` and
+  pass `mu_sd` to `SS.project`; `rp_effect` → merge `_rp_share` into the P obs frame (fillna +
+  centring identical to backtest) and pass `role_x`/`use_role`; `innov="t4"` → pass through to
+  `SS.build_model` and `SS.project`. Add matching `project` CLI flags defaulting to the accepted
+  configuration — ✔ `make project --quick` completes, schema check passes, and per-stage log shows
+  the flags; `make test` green.
 

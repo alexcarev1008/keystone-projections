@@ -86,7 +86,8 @@ def build_stage_data(obs: pd.DataFrame, window_end: int, exposures: pd.DataFrame
     return StageData(obs=obs, states=st, X_park=X, venues=venues, window_end=window_end)
 
 
-def build_model(d: StageData, use_park: bool, use_indicator: bool = False) -> pm.Model:
+def build_model(d: StageData, use_park: bool, use_indicator: bool = False,
+                innov: str = "normal", use_role: bool = False) -> pm.Model:
     obs, st = d.obs, d.states
     n_ages = AGE_MAX - AGE_MIN + 1
     with pm.Model() as m:
@@ -98,14 +99,34 @@ def build_model(d: StageData, use_park: bool, use_indicator: bool = False) -> pm
         steps = pm.Normal("age_steps_raw", 0.0, 1.0, shape=n_ages - 1)
         g = pm.Deterministic("g_age", pt.concatenate([pt.stack([g0]), g0 + pt.cumsum(steps * sigma_age)]))
 
-        e = pm.Normal("e", 0.0, 1.0, shape=len(st))
-        inc = pt.switch(st.is_first.to_numpy(),
-                        lam * st.log_pa_first_z.to_numpy() + sigma_pop * e,
-                        g[_age_bucket(st.age)] + tau * e)
+        if innov == "normal":
+            e = pm.Normal("e", 0.0, 1.0, shape=len(st))
+            inc = pt.switch(st.is_first.to_numpy(),
+                            lam * st.log_pa_first_z.to_numpy() + sigma_pop * e,
+                            g[_age_bucket(st.age)] + tau * e)
+        elif innov == "t4":
+            # M2a E4: heavy-tailed transitions (first-season population draw stays Normal).
+            # Disjoint index sets keep the latent dimension at len(st).
+            first_idx = np.flatnonzero(st.is_first.to_numpy())
+            trans_idx = np.flatnonzero(~st.is_first.to_numpy())
+            e1 = pm.Normal("e_first", 0.0, 1.0, shape=len(first_idx))
+            et = pm.StudentT("e_trans", nu=4, mu=0.0, sigma=1.0, shape=len(trans_idx))
+            inc = pt.zeros(len(st))
+            inc = pt.set_subtensor(
+                inc[first_idx],
+                lam * st.log_pa_first_z.to_numpy()[first_idx] + sigma_pop * e1)
+            inc = pt.set_subtensor(
+                inc[trans_idx],
+                g[_age_bucket(st.age.to_numpy()[trans_idx])] + tau * et)
+        else:
+            raise ValueError(f"unknown innov {innov!r}")
         C = pt.cumsum(inc)
         theta = pm.Deterministic("theta", C - pt.concatenate([pt.zeros(1), C])[st.start_idx.to_numpy()])
 
         logit_p = obs.mu_league.to_numpy() + theta[obs.state_idx.to_numpy()]
+        if use_role:
+            delta_role = pm.Normal("delta_role", 0.0, 0.5)
+            logit_p = logit_p + delta_role * obs.x_role.to_numpy()
         if use_park and d.X_park is not None:
             park_sd = pm.HalfNormal("park_sd", 0.1)
             phi = pm.Deterministic("phi", pm.Normal("phi_raw", 0.0, 1.0, shape=len(d.venues)) * park_sd)
@@ -137,12 +158,16 @@ def fit(model: pm.Model, draws: int = 500, tune: int = 500, chains: int = 2, see
 
 
 def project(idata, d: StageData, horizons: int, mu_proj: float, rng: np.random.Generator,
-            park_exposure: dict | None = None) -> tuple[pd.DataFrame, np.ndarray]:
+            park_exposure: dict | None = None, mu_sd: float = 0.0,
+            role_x: dict | None = None, innov: str = "normal") -> tuple[pd.DataFrame, np.ndarray]:
     """Project every player who has a state at window_end.
 
     Returns (players, P) where players has columns mlbam_id, age_next and
     P has shape (n_players, horizons, n_draws) = talent probability for seasons window_end+1 .. +horizons.
     park_exposure: optional {mlbam_id: {venue_id: 0.5*share}} -> non-neutral projection. Default neutral.
+    mu_sd: environment forecast sd; one persistent shock per posterior draw (common across
+    players and horizons — league-environment error is shared, not per-player).
+    role_x: optional {mlbam_id: centred covariate} paired with a fitted delta_role.
     """
     post = idata.posterior
     stack = lambda v: post[v].stack(s=("chain", "draw")).to_numpy()
@@ -150,10 +175,18 @@ def project(idata, d: StageData, horizons: int, mu_proj: float, rng: np.random.G
     S = th.shape[-1]
     last = d.states[d.states.season == d.window_end]
     cur = th[last.index.to_numpy()]                      # (n_players, S)
+    env_shock = mu_sd * rng.standard_normal(S) if mu_sd > 0 else 0.0
+    role_term = 0.0
+    if role_x is not None and "delta_role" in post:
+        delta = stack("delta_role")
+        x = np.array([role_x.get(pid, 0.0) for pid in last.mlbam_id])
+        role_term = x[:, None] * delta[None, :]
     P = np.empty((len(last), horizons, S))
+    step_noise = (lambda: rng.standard_t(4, cur.shape)) if innov == "t4" \
+        else (lambda: rng.standard_normal(cur.shape))
     for h in range(1, horizons + 1):
-        cur = cur + g[_age_bucket(last.age.to_numpy() + h)] + tau * rng.standard_normal(cur.shape)
-        logit = mu_proj + cur
+        cur = cur + g[_age_bucket(last.age.to_numpy() + h)] + tau * step_noise()
+        logit = mu_proj + env_shock + role_term + cur
         if park_exposure is not None and "phi" in post:
             phi = stack("phi")
             vpos = {v: j for j, v in enumerate(d.venues)}

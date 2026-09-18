@@ -278,9 +278,17 @@ def _diagnostics(idata) -> dict:
     return out
 
 
+def _rp_share(ps_p: pd.DataFrame) -> pd.DataFrame:
+    """M2a E3: reliever share per pitcher-season = 1 - GS/G (in [0, 1])."""
+    g = ps_p.gamesPitched.clip(lower=1)
+    return pd.DataFrame({"mlbam_id": ps_p.mlbam_id, "season": ps_p.season,
+                         "rp_share": (1.0 - ps_p.gamesStarted / g).clip(0.0, 1.0)})
+
+
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
                     indicator: pd.DataFrame | None = None, seed: int = 1,
-                    park_aware: bool = True):
+                    park_aware: bool = True, env_mode: str = "mean3",
+                    rp_effect: bool = False, innov: str = "normal"):
     """Fit one stage on the 6-season window ending at target-1.
 
     Returns (ids, draws, diagnostics) where draws is (n_players, n_draws): the h=1 talent
@@ -288,6 +296,11 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
     (park_aware=True, the default): Marcel inherits each player's park implicitly through his
     raw rates, so a park-neutral Tier 2 would be scored against park-inflected actuals with a
     handicap Marcel does not carry. park_aware=False restores the neutral projection.
+
+    M2a experiment flags (docs/fable/M2_experiments.md):
+      env_mode="recency"  E2: recency+size-weighted league forecast + common env shock in draws
+      rp_effect=True      E3: SP/RP covariate on pitcher stages (ignored for role H)
+      innov="t4"          E4: Student-t(4) talent innovations
     """
     window_end = target - 1
     window = (window_end - C.WINDOW_LEN + 1, window_end)
@@ -301,6 +314,19 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
     if indicator is not None:
         obs = obs.merge(indicator, on=["mlbam_id", "season"], how="left")
 
+    use_role = rp_effect and role == "P"
+    role_x = None
+    if use_role:
+        rp = _rp_share(train.ps["P"])
+        obs = obs.merge(rp, on=["mlbam_id", "season"], how="left")
+        obs["rp_share"] = obs.rp_share.fillna(rp.rp_share.mean())
+        center = float(obs.rp_share.mean())
+        obs["x_role"] = obs.rp_share - center
+        # projection covariate: last observed rp_share per player, same centring
+        last_rp = (rp[rp.season <= window_end].sort_values("season")
+                   .groupby("mlbam_id").rp_share.last())
+        role_x = {int(p): float(v) - center for p, v in last_rp.items()}
+
     use_park = stage in PARK_STAGES
     exposures = None
     if use_park:
@@ -308,14 +334,22 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
         exposures = e[e.season.between(*window)]
 
     d = SS.build_stage_data(obs, window_end, exposures)
-    model = SS.build_model(d, use_park=use_park, use_indicator=indicator is not None)
+    model = SS.build_model(d, use_park=use_park, use_indicator=indicator is not None,
+                           innov=innov, use_role=use_role)
     idata = SS.fit(model, seed=seed, target_accept=0.95 if indicator is not None else 0.9,
                    **sampling)
     diag = _diagnostics(idata)
-    mu_proj = LG.projection_logit(train.lg[role], stage, window_end)
+    if use_role:
+        arr = np.asarray(idata.posterior["delta_role"])
+        diag["delta_role_mean"], diag["delta_role_sd"] = float(arr.mean()), float(arr.std())
+    if env_mode == "recency":
+        mu_proj, mu_sd = LG.projection_logit_recency(train.lg[role], stage, window_end)
+    else:
+        mu_proj, mu_sd = LG.projection_logit(train.lg[role], stage, window_end), 0.0
     exposure = park_exposure_map(exposures, window_end) if (park_aware and use_park) else None
     players, P = SS.project(idata, d, horizons=1, mu_proj=mu_proj,
-                            rng=np.random.default_rng(seed), park_exposure=exposure)
+                            rng=np.random.default_rng(seed), park_exposure=exposure,
+                            mu_sd=mu_sd, role_x=role_x, innov=innov)
     ids, draws = players.mlbam_id.to_numpy(), np.ascontiguousarray(P[:, 0, :])
     del idata, model, d, P
     gc.collect()
@@ -323,12 +357,14 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
 
 
 def tier_draws(train: Bundle, role: str, target: int, stages: list[str], sampling: dict,
-               indicators: dict | None = None, seed: int = 1, park_aware: bool = True):
+               indicators: dict | None = None, seed: int = 1, park_aware: bool = True,
+               env_mode: str = "mean3", rp_effect: bool = False, innov: str = "normal"):
     """Fit stages one at a time (memory — MANUAL §12) and align them on one player index."""
     raw, diags, ids_common = {}, {}, None
     for stage in stages:
         ids, draws, diag = fit_stage_draws(train, role, stage, target, sampling,
-                                           (indicators or {}).get(stage), seed, park_aware)
+                                           (indicators or {}).get(stage), seed, park_aware,
+                                           env_mode=env_mode, rp_effect=rp_effect, innov=innov)
         raw[stage] = (ids, draws)
         diags[stage] = diag
         ids_common = pd.Index(ids) if ids_common is None else ids_common.intersection(ids)
@@ -471,8 +507,9 @@ def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
 
 
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
-               sampling: dict, seed: int = 1,
-               park_aware: bool = True) -> tuple[list[dict], list[dict], list[dict]]:
+               sampling: dict, seed: int = 1, park_aware: bool = True,
+               env_mode: str = "mean3", rp_effect: bool = False,
+               innov: str = "normal") -> tuple[list[dict], list[dict], list[dict]]:
     """Returns (score_rows, prediction_rows, posterior_rows). The last two feed the sidecar
     parquets; empty lists when no tier fit ran or the eval population is empty."""
     train = train_slice(b, target)
@@ -517,7 +554,8 @@ def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
         print(f"  [warn] tier 3 requested for {role} but no Statcast indicator on disk for any of "
               f"{stages} — running Tier 2 fits (labelled tier3)")
     ss_ids, P, diags = tier_draws(train, role, target, stages, sampling,
-                                  indicators=indicators, seed=seed, park_aware=park_aware)
+                                  indicators=indicators, seed=seed, park_aware=park_aware,
+                                  env_mode=env_mode, rp_effect=rp_effect, innov=innov)
 
     if set(stages) == set(ROLE_STAGES[role]):
         score(tier_name, pd.DataFrame({st: P[st].mean(axis=1) for st in P}, index=ss_ids),
@@ -627,10 +665,12 @@ def _json_safe(o):
 
 
 def write_json(path: Path, rows: list[dict], targets: list[int], gates: dict, production: dict,
-               holdout_target: int | None, park_aware: bool = True) -> dict:
+               holdout_target: int | None, park_aware: bool = True,
+               experiment_flags: dict | None = None) -> dict:
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "targets": sorted(targets), "holdout_target": holdout_target,
                "park_aware_scoring": park_aware,
+               "experiment_flags": experiment_flags,
                "rows": rows, "gates": gates, "production_tier": production}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=1, default=_json_safe))
@@ -685,7 +725,8 @@ POST_SCHEMA = ["target", "role", "tier", "stage",
 
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
         out: Path | None = None, holdout: bool = False, seed: int = 1,
-        park_aware: bool = True) -> dict:
+        park_aware: bool = True, env_mode: str = "mean3", rp_effect: bool = False,
+        innov: str = "normal") -> dict:
     mode = "quick" if quick else "dev"
     sampling = SAMPLING[mode]
     if quick:
@@ -699,8 +740,9 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     out = Path(out)
 
     b = load_bundle()
+    flags = dict(env_mode=env_mode, rp_effect=rp_effect, innov=innov)
     print(f"[backtest] mode={mode} tier={tier} targets={targets} roles={roles} "
-          f"sampling={sampling} park_aware={park_aware} -> {out.name}")
+          f"sampling={sampling} park_aware={park_aware} flags={flags} -> {out.name}")
 
     new_rows: list[dict] = []
     new_preds: list[dict] = []
@@ -710,7 +752,8 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
             st = list(stages) if stages else list(ROLE_STAGES[role])
             print(f"[backtest] target {target} role {role} stages {st}")
             r, p, po = run_target(b, role, target, tier, st, sampling, seed=seed,
-                                  park_aware=park_aware)
+                                  park_aware=park_aware, env_mode=env_mode,
+                                  rp_effect=rp_effect, innov=innov)
             new_rows += r
             new_preds += p
             new_posts += po
@@ -723,7 +766,8 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     holdout_target = C.HOLDOUT_TARGET if holdout else old.get("holdout_target")
 
     print_summary(new_rows, gates, production, targets)
-    payload = write_json(out, rows, all_targets, gates, production, holdout_target, park_aware)
+    payload = write_json(out, rows, all_targets, gates, production, holdout_target, park_aware,
+                         experiment_flags=flags)
 
     suffix = "_quick" if quick else ""
     _write_sidecar(out.parent / f"backtest_predictions{suffix}.parquet", new_preds, PRED_SCHEMA)
