@@ -28,13 +28,18 @@
 
 ## Next command(s) for Daniel
 - **After Fable M1 (2026-09-17):** re-run the dev backtests so the gates reflect park-aware scoring
-  (both runs, so tier2 and tier3 rows stay comparable — ~50 min each):
+  (both runs, so tier2 and tier3 rows stay comparable — ~50 min each). Opus wired the M1
+  sidecars 2026-09-17 (see Results below), so the re-run also writes
+  `backtest_predictions.parquet` + `backtest_posteriors.parquet` next to `backtest.json`, which
+  `make diagnostics` reads to fill the Tier 2/3 rows in the Fable context pack:
   - `make backtest`
   - `make backtest TIER=3`
   - `make diagnostics`
   - paste the printed RMSE table + gates back into a Fable session ("Results of `make backtest`: …").
     M1's pre-registered prediction (in M1_audit.md): H/hr RMSE → ~.0135, H/hr cov80 → ~.80,
     pitcher rows ~unchanged. Still do NOT run `make holdout`.
+  - If either role's tier2 gate flips to PASS, ping Opus to wire item 3 of HANDOFF.md (thread
+    `park_exposure_map` into `project.py` so shipped Tier 2 points match the validated scoring).
 - **Smoke-test P5** (one terminal per line, no long job):
   - `make api` — FastAPI on :8000 against `data/artifacts/`.
   - `make web` — Vite dev server on :5173 (first run does `npm install`).
@@ -50,6 +55,31 @@
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M1 handoff wire-up — Opus (2026-09-17, code only, no long compute)
+Ticked items 1, 2, 4 in `docs/fable/HANDOFF.md`; item 3 deferred (see below).
+- **backtest.py sidecar.** `_diagnostics` now returns mean+sd for every scalar pop param
+  (tau, sigma_pop, lam, sigma_age, park_sd) plus ess_bulk_min alongside max_rhat/divergences.
+  `run_target` returns `(score_rows, pred_rows, post_rows)`; `run()` merges per-target
+  block-by-block into `backtest_predictions{,_quick}.parquet` and
+  `backtest_posteriors{,_quick}.parquet` next to `backtest{,_quick}.json`. Predictions cover the
+  eval intersection (players with actuals). FIP pred draws use per-player actual PA/IP; hitter
+  derived stats broadcast cleanly.
+- **diagnostics.py consumes it.** `residuals_by_bucket` / `pit_histograms` / `biggest_misses` /
+  `posterior_summaries` gain Tier 2/3 rows when the sidecar is on disk (falls back to Marcel-only
+  when missing, so `make diagnostics` runs green either way). Sidecar-fed PIT is piecewise-linear
+  from q10/q50/q90 (not truly posterior-predictive, called out in the `note` column); tier2 cov80
+  in residuals_by_bucket is computed from sidecar q10/q90 against the actual.
+- **Methodology.tsx** gains one Validation-section sentence: "As of M1, backtest scoring is
+  park-aware… see `backtest.json.park_aware_scoring`." `npm run build` passes (609 modules,
+  672 kB bundle unchanged).
+- **Item 3 deferred** — the "thread park exposure into `project.py`" edit is gated on a tier2
+  gate flip to PASS after Daniel's re-run. Current gates on disk still say Marcel for both roles.
+- **Acceptance:** `make test` 31/31 pass; `make backtest-quick` writes both sidecar files (696
+  pred rows, 2 post rows) alongside `backtest_quick.json`; `make diagnostics` runs green with and
+  without the sidecar on disk. Quick sidecar carries only H `stage_k`/`stage_hr` rows, so
+  residuals_by_bucket etc. show non-Marcel rows only after Daniel's full re-run populates
+  derived-stat predictions.
 
 ### M1 statistical red team — Fable (2026-09-17)
 Full findings: `docs/fable/M1_audit.md`. One root cause fixed, four findings for M2, rest clean.
@@ -394,6 +424,15 @@ Real modeling findings this run surfaces (write in the Methodology page):
    the most stable skills, where a hierarchical model should be at its strongest. Lower priority
    than 1 and 2, but it does not fit the "shrinkage helps unstable stats" story and may share a
    cause with 2 (H/bb is the second-largest divergence cluster, 47).
+
+## Questions for Daniel (Opus, 2026-09-17)
+- **Item 3 of HANDOFF.md is deferred**, because its trigger — a tier2 gate flip to PASS on the
+  re-run — hasn't fired yet. Two paths:
+  (a) Wait for your re-run and ping Opus if a gate flips (current plan).
+  (b) Do it now regardless: it's a no-op while `production_tier` stays `marcel` (the shift-to-
+      Marcel path in `project._anchor_to_marcel` runs on the neutral draws today), so wiring
+      park exposure has no shipped effect until a gate flips. Leaves less to do afterwards.
+  Preference?
 
 ## Blockers
 - none

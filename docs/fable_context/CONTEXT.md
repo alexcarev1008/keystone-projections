@@ -1,6 +1,6 @@
 # KEYSTONE — Fable context pack
 
-generated: 2026-09-18T01:54:43+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
+generated: 2026-09-18T02:39:51+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
 
 ## 1. What KEYSTONE is (one paragraph)
 
@@ -102,25 +102,24 @@ Each CSV is capped at 2,000 rows; this file is capped at 400 lines.
 | file | rows | source | notes |
 |---|---:|---|---|
 | backtest_summary.csv | 200 | data/artifacts/backtest.json | complete |
-| posterior_summaries.csv | 108 | meta.json + backtest diag rows | tau/sigma_pop only for target=window_end; sd/ess/lam null |
+| posterior_summaries.csv | 108 | meta.json + backtest diag rows + sidecar (M1) | sidecar missing |
 | aging_curves.csv | 462 | data/artifacts/aging.parquet | mean only; q10/q90 need per-draw sidecar |
 | park_effects.csv | 16 | meta.json top/bottom_hr_parks | phi_sd null; only top/bottom 3 for hr; other park stages absent |
-| residuals_by_bucket.csv | 1375 | recomputed Marcel vs actuals | Tier 2/3 rows absent (need per-player pred store) |
-| pit_histograms.csv | 100 | Marcel residuals, normal approx | Tier 2/3 PIT needs per-draw sidecar |
-| biggest_misses.csv | 320 | recomputed Marcel key-stat errors | Tier 2/3 misses need per-player pred store |
+| residuals_by_bucket.csv | 1375 | Marcel vs actuals + sidecar Tier 2/3 (M1) | sidecar missing |
+| pit_histograms.csv | 100 | Marcel normal approx + sidecar piecewise Tier 2/3 (M1) | sidecar missing |
+| biggest_misses.csv | 320 | Marcel + sidecar Tier 2/3 key-stat errors (M1) | sidecar missing |
 | stage_correlations.csv | 74 | observed residual rates in last window | proxy for talent correlation; not from posteriors |
 | pt_summary.csv | 26 | Marcel PT vs actual for target=2025 | includes share_zero_actual |
 | code_map.md | 1 per file | walk of backend/keystone/ | |
 
-### Gaps Fable can spec via HANDOFF.md
+### Sidecar (M1)
 
-Any Tier 2/3 per-player analysis (PIT, buckets, misses) needs backtest.py to persist a
-sidecar. Suggested one-line spec: on each run write `backtest_predictions.parquet`
-(target, role, tier, mlbam_id, stat, pred_mean, q10, q50, q90) and
-`backtest_posteriors.parquet` (target, role, tier, stage, tau_mean, tau_sd, sigma_pop_*,
-lam_*, sigma_age_*, park_sd_*, ess_bulk_min, max_rhat, divergences). Once that lands,
-re-running `make backtest && make diagnostics` fills every column above without changing
-this module's public shape.
+`backtest_predictions.parquet` (target, role, tier, mlbam_id, stat, pred_mean, q10, q50,
+q90) and `backtest_posteriors.parquet` (target, role, tier, stage, tau_mean, tau_sd,
+sigma_pop_*, lam_*, sigma_age_*, park_sd_*, ess_bulk_min, max_rhat, divergences) are
+written next to backtest.json on every `make backtest`. Current status: **missing**.
+When present, the sidecar fills the Tier 2/3 columns of the tables above; when absent,
+diagnostics falls back to Marcel-only rows so `make diagnostics` never fails.
 
 ## 8. Pointers into the code
 

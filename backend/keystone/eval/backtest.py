@@ -233,20 +233,49 @@ def park_exposure_map(exposures: pd.DataFrame | None, window_end: int) -> dict:
             for p, g in e.groupby("mlbam_id")}
 
 
+_SCALAR_POP_PARAMS = ("tau", "sigma_pop", "lam", "sigma_age", "park_sd")
+
+
 def _diagnostics(idata) -> dict:
-    """Sampler health on the population parameters. r_hat needs >= 2 chains; it is None below that."""
-    names = [v for v in ("tau", "sigma_pop", "lam", "sigma_age", "g0", "park_sd")
-             if v in idata.posterior]
+    """Sampler health + posterior mean/sd for the scalar population parameters.
+
+    r_hat/ess need >= 2 chains and are None below that. Missing parameters (e.g. park_sd on a
+    non-park stage) come back as None so the sidecar schema stays fixed across stages.
+    """
+    post = idata.posterior
+    out: dict = {}
+    for name in _SCALAR_POP_PARAMS:
+        if name in post:
+            arr = np.asarray(post[name])
+            out[f"{name}_mean"] = float(np.mean(arr))
+            out[f"{name}_sd"] = float(np.std(arr))
+        else:
+            out[f"{name}_mean"] = None
+            out[f"{name}_sd"] = None
+
+    present = [v for v in _SCALAR_POP_PARAMS if v in post] or \
+              [v for v in ("g0",) if v in post]
     max_rhat = None
-    if idata.posterior.sizes.get("chain", 1) > 1:
-        r = az.rhat(idata, var_names=names)
-        vals = [float(np.nanmax(np.asarray(r[v]))) for v in names
+    if post.sizes.get("chain", 1) > 1 and present:
+        r = az.rhat(idata, var_names=present)
+        vals = [float(np.nanmax(np.asarray(r[v]))) for v in present
                 if np.isfinite(np.asarray(r[v])).any()]
         max_rhat = round(max(vals), 4) if vals else None
-    div = 0
-    if "diverging" in idata.sample_stats:
-        div = int(np.asarray(idata.sample_stats["diverging"]).sum())
-    return {"max_rhat": max_rhat, "divergences": div}
+
+    ess_bulk_min = None
+    if present:
+        try:
+            e = az.ess(idata, var_names=present, method="bulk")
+            evals = [float(np.nanmin(np.asarray(e[v]))) for v in present
+                     if np.isfinite(np.asarray(e[v])).any()]
+            ess_bulk_min = float(min(evals)) if evals else None
+        except Exception:
+            ess_bulk_min = None
+
+    div = int(np.asarray(idata.sample_stats["diverging"]).sum()) \
+        if "diverging" in idata.sample_stats else 0
+    out.update({"max_rhat": max_rhat, "divergences": div, "ess_bulk_min": ess_bulk_min})
+    return out
 
 
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
@@ -354,6 +383,75 @@ def interval_coverage(P: dict, ids: np.ndarray, actual: pd.DataFrame, role: str,
             for stat, d in hits.items()}
 
 
+# ---------------------------------------------------------------- sidecars
+
+def _predictions_from_stage_draws(P_keep: dict, role: str, stages: list[str], env: dict,
+                                  pa_keep: np.ndarray | None,
+                                  ip_keep: np.ndarray | None) -> dict[str, np.ndarray]:
+    """(n_players, n_draws) derived-stat draws (or stage-rate draws when partial)."""
+    partial = set(stages) != set(ROLE_STAGES[role])
+    if partial:
+        return {f"stage_{s}": np.asarray(P_keep[s], dtype=float) for s in stages}
+    if role == "H":
+        out = derive_hitter(P_keep, env, env["sf_rate"])
+    else:
+        out = derive_pitcher(P_keep, env["kappa"], env["c_fip"])
+        r = per_pa_from_stage_rates(P_keep)
+        events = 13 * r["hr"] + 3 * (r["bb"] + r["hbp"]) - 2 * r["k"]
+        pa_b = np.asarray(pa_keep, dtype=float)[:, None]
+        ip_b = np.asarray(ip_keep, dtype=float)[:, None]
+        out["fip"] = events * pa_b / ip_b + env["c_fip"]
+    return {s: np.asarray(out[s], dtype=float) for s in STATS[role]}
+
+
+def _sidecar_predictions(target: int, role: str, tier_name: str, stages: list[str],
+                         ss_ids: np.ndarray, P: dict, ids: np.ndarray, env: dict,
+                         pa: pd.Series, ip: pd.Series) -> list[dict]:
+    """Per-player mean/q10/q50/q90 for the tier's stat set. Restricted to the eval intersection
+    (players with actuals) so downstream analyses always have something to compare against."""
+    pos = pd.Series(np.arange(len(ss_ids)), index=ss_ids)
+    keep = np.array([int(i) for i in ids if i in pos.index], dtype="int64")
+    if not len(keep):
+        return []
+    take = pos.loc[keep].to_numpy()
+    P_keep = {s: P[s][take] for s in P}
+    pa_keep = pa.loc[keep].to_numpy(dtype=float) if role == "P" else None
+    ip_keep = ip.loc[keep].to_numpy(dtype=float) if role == "P" else None
+    stat_arrays = _predictions_from_stage_draws(P_keep, role, stages, env, pa_keep, ip_keep)
+    rows = []
+    for stat, arr in stat_arrays.items():
+        ok = np.isfinite(arr)
+        mean = np.where(ok.any(axis=-1),
+                        np.nanmean(np.where(ok, arr, np.nan), axis=-1), np.nan)
+        q = np.nanquantile(np.where(ok, arr, np.nan), [0.10, 0.50, 0.90], axis=-1)
+        for i, pid in enumerate(keep):
+            rows.append({"target": int(target), "role": role, "tier": tier_name,
+                         "mlbam_id": int(pid), "stat": stat,
+                         "pred_mean": float(mean[i]) if np.isfinite(mean[i]) else None,
+                         "q10": float(q[0, i]) if np.isfinite(q[0, i]) else None,
+                         "q50": float(q[1, i]) if np.isfinite(q[1, i]) else None,
+                         "q90": float(q[2, i]) if np.isfinite(q[2, i]) else None})
+    return rows
+
+
+def _sidecar_posteriors(target: int, role: str, tier_name: str, diags: dict) -> list[dict]:
+    rows = []
+    for stage, d in diags.items():
+        rows.append({"target": int(target), "role": role, "tier": tier_name, "stage": stage,
+                     "tau_mean": d.get("tau_mean"), "tau_sd": d.get("tau_sd"),
+                     "sigma_pop_mean": d.get("sigma_pop_mean"),
+                     "sigma_pop_sd": d.get("sigma_pop_sd"),
+                     "lam_mean": d.get("lam_mean"), "lam_sd": d.get("lam_sd"),
+                     "sigma_age_mean": d.get("sigma_age_mean"),
+                     "sigma_age_sd": d.get("sigma_age_sd"),
+                     "park_sd_mean": d.get("park_sd_mean"),
+                     "park_sd_sd": d.get("park_sd_sd"),
+                     "ess_bulk_min": d.get("ess_bulk_min"),
+                     "max_rhat": d.get("max_rhat"),
+                     "divergences": d.get("divergences")})
+    return rows
+
+
 # ---------------------------------------------------------------- one target
 
 def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
@@ -373,13 +471,16 @@ def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
 
 
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
-               sampling: dict, seed: int = 1, park_aware: bool = True) -> list[dict]:
+               sampling: dict, seed: int = 1,
+               park_aware: bool = True) -> tuple[list[dict], list[dict], list[dict]]:
+    """Returns (score_rows, prediction_rows, posterior_rows). The last two feed the sidecar
+    parquets; empty lists when no tier fit ran or the eval population is empty."""
     train = train_slice(b, target)
     env = scoring_env(b, role, target)
     ids = eval_population(b, role, target)
     if len(ids) == 0:
         print(f"  [skip] {role} {target}: empty evaluation population")
-        return []
+        return [], [], []
 
     obs_t = b.ps[role]
     obs_t = obs_t[(obs_t.season == target) & obs_t.mlbam_id.isin(ids)]
@@ -435,7 +536,9 @@ def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
     rows.append({"target": target, "role": role, "tier": tier_name, "stat": DIAG_STAT,
                  "n": None, "rmse": None, "mae": None, "cov50": None, "cov80": None,
                  "diagnostics": diags})
-    return rows
+    pred_rows = _sidecar_predictions(target, role, tier_name, stages, ss_ids, P, ids, env, pa, ip)
+    post_rows = _sidecar_posteriors(target, role, tier_name, diags)
+    return rows, pred_rows, post_rows
 
 
 def _coverage_for(P, ss_ids, ids, actual, role, env, pa, ip) -> dict:
@@ -543,6 +646,41 @@ def _merge_rows(old: list[dict], new: list[dict]) -> list[dict]:
             if (r.get("target"), r.get("role"), r.get("tier")) not in touched] + new
 
 
+def _write_sidecar(path: Path, new_rows: list[dict], schema_cols: list[str]) -> None:
+    """Merge on (target, role, tier) and write the sidecar parquet. Missing schema columns are
+    filled with nulls so the frame shape is stable across quick/dev/partial runs."""
+    if not new_rows and not path.exists():
+        return                                          # nothing to persist
+    new_df = pd.DataFrame(new_rows, columns=schema_cols) if new_rows \
+        else pd.DataFrame(columns=schema_cols)
+    if path.exists():
+        old = pd.read_parquet(path)
+        for c in schema_cols:
+            if c not in old.columns:
+                old[c] = None
+        if not new_df.empty:
+            touched = set((int(t), r, ti)
+                          for t, r, ti in zip(new_df.target, new_df.role, new_df.tier))
+            mask = np.array([(int(t), r, ti) not in touched
+                             for t, r, ti in zip(old.target, old.role, old.tier)])
+            old = old.loc[mask]
+        combined = pd.concat([old[schema_cols], new_df[schema_cols]], ignore_index=True)
+    else:
+        combined = new_df[schema_cols]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_parquet(path, index=False)
+    print(f"[backtest] wrote {path.name} ({len(combined)} rows)")
+
+
+PRED_SCHEMA = ["target", "role", "tier", "mlbam_id", "stat",
+               "pred_mean", "q10", "q50", "q90"]
+POST_SCHEMA = ["target", "role", "tier", "stage",
+               "tau_mean", "tau_sd", "sigma_pop_mean", "sigma_pop_sd",
+               "lam_mean", "lam_sd", "sigma_age_mean", "sigma_age_sd",
+               "park_sd_mean", "park_sd_sd",
+               "ess_bulk_min", "max_rhat", "divergences"]
+
+
 # ---------------------------------------------------------------- entry point
 
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
@@ -565,12 +703,17 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
           f"sampling={sampling} park_aware={park_aware} -> {out.name}")
 
     new_rows: list[dict] = []
+    new_preds: list[dict] = []
+    new_posts: list[dict] = []
     for target in targets:
         for role in roles:
             st = list(stages) if stages else list(ROLE_STAGES[role])
             print(f"[backtest] target {target} role {role} stages {st}")
-            new_rows += run_target(b, role, target, tier, st, sampling, seed=seed,
-                                   park_aware=park_aware)
+            r, p, po = run_target(b, role, target, tier, st, sampling, seed=seed,
+                                  park_aware=park_aware)
+            new_rows += r
+            new_preds += p
+            new_posts += po
 
     old = json.loads(out.read_text()) if out.exists() else {}
     rows = _merge_rows(old.get("rows", []), new_rows)
@@ -581,4 +724,8 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
 
     print_summary(new_rows, gates, production, targets)
     payload = write_json(out, rows, all_targets, gates, production, holdout_target, park_aware)
+
+    suffix = "_quick" if quick else ""
+    _write_sidecar(out.parent / f"backtest_predictions{suffix}.parquet", new_preds, PRED_SCHEMA)
+    _write_sidecar(out.parent / f"backtest_posteriors{suffix}.parquet", new_posts, POST_SCHEMA)
     return payload

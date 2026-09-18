@@ -10,12 +10,14 @@ Outputs to `docs/fable_context/`:
   CONTEXT.md               <=400 lines, the project in one page
   code_map.md              one line per backend file
   backtest_summary.csv     backtest.json rows
-  residuals_by_bucket.csv  Marcel per-player buckets (Tier 2/3 marked null; see gap notes)
-  pit_histograms.csv       Marcel PIT via normal approximation (no per-draw store for Tier 2)
-  posterior_summaries.csv  meta.json (target=window_end) + backtest diagnostic rows (per target)
+  residuals_by_bucket.csv  per-player buckets — Marcel always; Tier 2/3 when the sidecar exists
+  pit_histograms.csv       Marcel pooled normal-approx PIT; Tier 2/3 real PIT from the sidecar
+  posterior_summaries.csv  meta.json (target=window_end) + backtest diag rows, enriched from the
+                           posteriors sidecar when present
   aging_curves.csv         from aging.parquet (mean only; q10/q90 need per-draw store)
   park_effects.csv         meta.json top/bottom_hr_parks; other stages null
-  biggest_misses.csv       40 largest |error| per Marcel × dev target × role
+  biggest_misses.csv       40 largest |error| per Marcel × dev target × role (+Tier 2/3 rows when
+                           the sidecar exists)
   stage_correlations.csv   per-player stage residuals in the last window
   pt_summary.csv           Marcel PT vs actual PA/IP by age + prior-PT bucket
 """
@@ -65,6 +67,10 @@ def _write_csv(df: pd.DataFrame, path: Path, cap: int = CAP_ROWS) -> int:
     return len(df)
 
 
+def _load_parquet(p: Path) -> pd.DataFrame | None:
+    return pd.read_parquet(p) if p.exists() else None
+
+
 # ---------------------------------------------------------------- 1. backtest_summary
 
 def build_backtest_summary(bt: dict) -> pd.DataFrame:
@@ -79,8 +85,14 @@ def build_backtest_summary(bt: dict) -> pd.DataFrame:
 
 # ---------------------------------------------------------------- 2. posterior_summaries
 
-def build_posterior_summaries(bt: dict, meta: dict) -> pd.DataFrame:
-    """meta.json stages (target = window_end) + backtest diagnostic rows (target-level r_hat / div)."""
+def build_posterior_summaries(bt: dict, meta: dict,
+                              sidecar: pd.DataFrame | None = None) -> pd.DataFrame:
+    """meta.json stages (target=window_end) + backtest diagnostic rows (target-level r_hat/div).
+
+    When the posteriors sidecar exists, per-target rows carry tau/sigma_pop/lam/sigma_age/park_sd
+    means and sds plus ess_bulk_min. The DIAG_STAT rows in backtest.json embed the same numbers
+    (as of M1) and are only used as a fallback when the sidecar is missing.
+    """
     window_end = meta.get("window_end")
     rows: list[dict] = []
     for key, s in (meta.get("stages") or {}).items():
@@ -92,20 +104,45 @@ def build_posterior_summaries(bt: dict, meta: dict) -> pd.DataFrame:
                      "park_sd_mean": s.get("park_sd_mean"),
                      "lam_mean": None, "sigma_age_mean": None,
                      "tau_sd": None, "sigma_pop_sd": None,
+                     "lam_sd": None, "sigma_age_sd": None, "park_sd_sd": None,
                      "ess_bulk_min": None,
                      "max_rhat": s.get("max_rhat"),
                      "divergences": s.get("divergences")})
-    for row in bt.get("rows", []):
-        if row.get("stat") != DIAG_STAT or not row.get("diagnostics"):
-            continue
-        for stage, d in row["diagnostics"].items():
-            rows.append({"role": row["role"], "stage": stage, "target": row["target"],
-                         "tier": row["tier"],
-                         "tau_mean": None, "sigma_pop_mean": None, "park_sd_mean": None,
-                         "lam_mean": None, "sigma_age_mean": None,
-                         "tau_sd": None, "sigma_pop_sd": None, "ess_bulk_min": None,
-                         "max_rhat": d.get("max_rhat"),
-                         "divergences": d.get("divergences")})
+    if sidecar is not None and not sidecar.empty:
+        for r in sidecar.itertuples(index=False):
+            rows.append({"role": r.role, "stage": r.stage, "target": int(r.target),
+                         "tier": r.tier,
+                         "tau_mean": r.tau_mean, "tau_sd": r.tau_sd,
+                         "sigma_pop_mean": r.sigma_pop_mean,
+                         "sigma_pop_sd": r.sigma_pop_sd,
+                         "lam_mean": r.lam_mean, "lam_sd": r.lam_sd,
+                         "sigma_age_mean": r.sigma_age_mean,
+                         "sigma_age_sd": r.sigma_age_sd,
+                         "park_sd_mean": r.park_sd_mean,
+                         "park_sd_sd": r.park_sd_sd,
+                         "ess_bulk_min": r.ess_bulk_min,
+                         "max_rhat": r.max_rhat,
+                         "divergences": r.divergences})
+    else:
+        for row in bt.get("rows", []):
+            if row.get("stat") != DIAG_STAT or not row.get("diagnostics"):
+                continue
+            for stage, d in row["diagnostics"].items():
+                rows.append({"role": row["role"], "stage": stage, "target": row["target"],
+                             "tier": row["tier"],
+                             "tau_mean": d.get("tau_mean"),
+                             "tau_sd": d.get("tau_sd"),
+                             "sigma_pop_mean": d.get("sigma_pop_mean"),
+                             "sigma_pop_sd": d.get("sigma_pop_sd"),
+                             "lam_mean": d.get("lam_mean"),
+                             "lam_sd": d.get("lam_sd"),
+                             "sigma_age_mean": d.get("sigma_age_mean"),
+                             "sigma_age_sd": d.get("sigma_age_sd"),
+                             "park_sd_mean": d.get("park_sd_mean"),
+                             "park_sd_sd": d.get("park_sd_sd"),
+                             "ess_bulk_min": d.get("ess_bulk_min"),
+                             "max_rhat": d.get("max_rhat"),
+                             "divergences": d.get("divergences")})
     return pd.DataFrame(rows).sort_values(["role", "stage", "target", "tier"]).reset_index(drop=True)
 
 
@@ -238,8 +275,30 @@ def _history_bucket(y: int) -> str | None:
     return None
 
 
-def build_residuals_by_bucket(runs: dict[tuple[int, str], MarcelRun]) -> pd.DataFrame:
-    """One row per (tier=marcel, role, target, stat, age_bucket, pt_bucket, history_bucket)."""
+def _tier_pred_by_stat(sidecar: pd.DataFrame, target: int, role: str,
+                       tier: str) -> dict[str, pd.DataFrame]:
+    """Slice the predictions sidecar to one (target, role, tier). Returns {stat: DataFrame
+    indexed by mlbam_id with pred_mean, q10, q50, q90}."""
+    sub = sidecar[(sidecar.target == target) & (sidecar.role == role) & (sidecar.tier == tier)]
+    if sub.empty:
+        return {}
+    out = {}
+    for stat, part in sub.groupby("stat"):
+        out[stat] = (part.set_index("mlbam_id")[["pred_mean", "q10", "q50", "q90"]]
+                     .sort_index())
+    return out
+
+
+def _tier_covered(q10: np.ndarray, q90: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    ok = np.isfinite(q10) & np.isfinite(q90) & np.isfinite(actual)
+    return np.where(ok, (actual >= q10) & (actual <= q90), np.nan).astype(float)
+
+
+def build_residuals_by_bucket(runs: dict[tuple[int, str], MarcelRun],
+                              sidecar: pd.DataFrame | None = None) -> pd.DataFrame:
+    """One row per (tier, role, target, stat, age_bucket, pt_bucket, history_bucket). Marcel is
+    always included; Tier 2/3 rows are added whenever the sidecar carries a matching prediction
+    for the (target, role, stat, mlbam_id)."""
     rows: list[dict] = []
     for (target, role), r in runs.items():
         if r is None:
@@ -250,23 +309,41 @@ def build_residuals_by_bucket(runs: dict[tuple[int, str], MarcelRun]) -> pd.Data
             "pt_bucket": [_pt_bucket(p, role) for p in r.prior_pa.to_numpy()],
             "history_bucket": [_history_bucket(int(h)) for h in r.history_years.to_numpy()],
         }, index=r.ids)
-        for stat in STATS[role]:
-            e = (r.pred[stat].to_numpy() - r.actual[stat].to_numpy())
-            df = pd.DataFrame({"e": e, "w": w, **buckets.to_dict(orient="series")})
-            df = df.dropna(subset=["age_bucket", "pt_bucket", "history_bucket"])
-            df = df[np.isfinite(df.e) & np.isfinite(df.w) & (df.w > 0)]
-            g = df.groupby(["age_bucket", "pt_bucket", "history_bucket"], observed=True)
-            for keys, part in g:
-                ww = part.w / part.w.sum()
-                rows.append({"tier": "marcel", "role": role, "target": target, "stat": stat,
-                             "age_bucket": keys[0], "pt_bucket": keys[1],
-                             "history_bucket": keys[2],
-                             "n": int(len(part)),
-                             "mean_error": float((ww * part.e).sum()),
-                             "rmse": float(np.sqrt((ww * part.e ** 2).sum())),
-                             "cov80": None})
+        tier_stats: dict[str, dict[str, pd.DataFrame]] = {"marcel": {
+            stat: pd.DataFrame({"pred_mean": r.pred[stat], "q10": np.nan, "q50": np.nan,
+                                "q90": np.nan}, index=r.ids) for stat in STATS[role]}}
+        if sidecar is not None:
+            for tier in ("tier2", "tier3"):
+                by_stat = _tier_pred_by_stat(sidecar, target, role, tier)
+                if by_stat:
+                    tier_stats[tier] = by_stat
+        for tier, by_stat in tier_stats.items():
+            for stat, pred_df in by_stat.items():
+                if stat not in STATS[role]:
+                    continue                              # sidecar stage_* rows (partial runs)
+                pred = pred_df["pred_mean"].reindex(r.ids).to_numpy(dtype=float)
+                q10 = pred_df["q10"].reindex(r.ids).to_numpy(dtype=float)
+                q90 = pred_df["q90"].reindex(r.ids).to_numpy(dtype=float)
+                actual = r.actual[stat].to_numpy(dtype=float)
+                e = pred - actual
+                cov = _tier_covered(q10, q90, actual)
+                df = pd.DataFrame({"e": e, "w": w, "cov": cov,
+                                   **buckets.to_dict(orient="series")})
+                df = df.dropna(subset=["age_bucket", "pt_bucket", "history_bucket"])
+                df = df[np.isfinite(df.e) & np.isfinite(df.w) & (df.w > 0)]
+                g = df.groupby(["age_bucket", "pt_bucket", "history_bucket"], observed=True)
+                for keys, part in g:
+                    ww = part.w / part.w.sum()
+                    covered = part["cov"].dropna()
+                    rows.append({"tier": tier, "role": role, "target": target, "stat": stat,
+                                 "age_bucket": keys[0], "pt_bucket": keys[1],
+                                 "history_bucket": keys[2],
+                                 "n": int(len(part)),
+                                 "mean_error": float((ww * part.e).sum()),
+                                 "rmse": float(np.sqrt((ww * part.e ** 2).sum())),
+                                 "cov80": float(covered.mean()) if len(covered) else None})
     return pd.DataFrame(rows).sort_values(
-        ["role", "stat", "target", "age_bucket", "pt_bucket", "history_bucket"]
+        ["role", "stat", "target", "tier", "age_bucket", "pt_bucket", "history_bucket"]
     ).reset_index(drop=True)
 
 
@@ -276,13 +353,49 @@ def _normal_cdf(x: np.ndarray) -> np.ndarray:
     return 0.5 * (1.0 + np.vectorize(math.erf)(x / math.sqrt(2.0)))
 
 
-def build_pit_histograms(runs: dict[tuple[int, str], MarcelRun]) -> pd.DataFrame:
-    """Marcel PIT via a normal approximation. For each (role, stat) pool residuals across dev
-    targets to estimate a scale (PA-weighted RMSE), compute PIT = Phi((actual-pred)/scale) per
-    player, bin into 10 uniform bins. Real posterior-predictive PIT for Tier 2/3 needs a per-draw
-    sidecar (see CONTEXT.md gaps)."""
+def _piecewise_pit(actual: np.ndarray, q10: np.ndarray, q50: np.ndarray,
+                   q90: np.ndarray) -> np.ndarray:
+    """PIT approximated from three quantiles: linear between anchors (0.10, 0.50, 0.90); actuals
+    outside [q10, q90] are pushed to the mid-tail (0.05 / 0.95). Not the true posterior-predictive
+    PIT — that would need per-draw arrays — but close enough to spot calibration bias."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        pit = np.full_like(actual, np.nan, dtype=float)
+        ok = np.isfinite(actual) & np.isfinite(q10) & np.isfinite(q50) & np.isfinite(q90)
+        below = ok & (actual < q10)
+        above = ok & (actual > q90)
+        mid_low = ok & (actual >= q10) & (actual <= q50)
+        mid_high = ok & (actual > q50) & (actual <= q90)
+        pit[below] = 0.05
+        pit[above] = 0.95
+        d_lo = np.where(q50 - q10 > 0, q50 - q10, np.nan)
+        d_hi = np.where(q90 - q50 > 0, q90 - q50, np.nan)
+        pit[mid_low] = 0.10 + 0.40 * (actual[mid_low] - q10[mid_low]) / d_lo[mid_low]
+        pit[mid_high] = 0.50 + 0.40 * (actual[mid_high] - q50[mid_high]) / d_hi[mid_high]
+    return np.clip(pit, 0.0, 1.0)
+
+
+def _pit_histogram_rows(role: str, stat: str, tier: str, pit: np.ndarray, note: str,
+                        scale: float | None = None) -> list[dict]:
+    edges = np.linspace(0.0, 1.0, 11)
+    clean = pit[np.isfinite(pit)]
+    counts, _ = np.histogram(clean, bins=edges)
+    density = counts / max(counts.sum(), 1)
+    return [{"role": role, "stat": stat, "tier": tier,
+             "bin_lo": round(float(edges[i]), 2),
+             "bin_hi": round(float(edges[i + 1]), 2),
+             "count": int(counts[i]),
+             "density": float(density[i]),
+             "scale": scale,
+             "note": note} for i in range(10)]
+
+
+def build_pit_histograms(runs: dict[tuple[int, str], MarcelRun],
+                         sidecar: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Marcel PIT via a normal approximation. When the sidecar is present, also emit a
+    piecewise-linear PIT for tier2/tier3 rows using the stored q10/q50/q90."""
     rows: list[dict] = []
     pooled: dict[tuple[str, str], list[tuple[np.ndarray, np.ndarray]]] = {}
+    tier_pooled: dict[tuple[str, str, str], list[np.ndarray]] = {}
     for (target, role), r in runs.items():
         if r is None:
             continue
@@ -291,6 +404,21 @@ def build_pit_histograms(runs: dict[tuple[int, str], MarcelRun]) -> pd.DataFrame
             w = r.pa.to_numpy()
             ok = np.isfinite(e) & np.isfinite(w) & (w > 0)
             pooled.setdefault((role, stat), []).append((e[ok], w[ok]))
+        if sidecar is None:
+            continue
+        for tier in ("tier2", "tier3"):
+            by_stat = _tier_pred_by_stat(sidecar, target, role, tier)
+            if not by_stat:
+                continue
+            for stat, pred_df in by_stat.items():
+                if stat not in STATS[role]:
+                    continue
+                actual = r.actual[stat].reindex(pred_df.index).to_numpy(dtype=float)
+                q10 = pred_df["q10"].to_numpy(dtype=float)
+                q50 = pred_df["q50"].to_numpy(dtype=float)
+                q90 = pred_df["q90"].to_numpy(dtype=float)
+                pit = _piecewise_pit(actual, q10, q50, q90)
+                tier_pooled.setdefault((role, stat, tier), []).append(pit)
     for (role, stat), parts in pooled.items():
         e_all = np.concatenate([p[0] for p in parts])
         w_all = np.concatenate([p[1] for p in parts])
@@ -299,49 +427,65 @@ def build_pit_histograms(runs: dict[tuple[int, str], MarcelRun]) -> pd.DataFrame
         scale = float(np.sqrt(np.sum(w_all * e_all ** 2) / np.sum(w_all)))
         if scale <= 0 or not np.isfinite(scale):
             continue
-        pit = _normal_cdf(-e_all / scale)             # pred + scale*z = actual -> z = -e/scale
-        edges = np.linspace(0.0, 1.0, 11)
-        counts, _ = np.histogram(pit, bins=edges)
-        density = counts / max(counts.sum(), 1)
-        for i in range(10):
-            rows.append({"role": role, "stat": stat, "tier": "marcel",
-                         "bin_lo": round(float(edges[i]), 2),
-                         "bin_hi": round(float(edges[i + 1]), 2),
-                         "count": int(counts[i]),
-                         "density": float(density[i]),
-                         "scale": scale,
-                         "note": "normal approx from pooled residuals"})
+        pit = _normal_cdf(-e_all / scale)
+        rows.extend(_pit_histogram_rows(role, stat, "marcel", pit,
+                                         "normal approx from pooled residuals", scale))
+    for (role, stat, tier), parts in tier_pooled.items():
+        pit_all = np.concatenate(parts)
+        if np.isfinite(pit_all).sum() < 20:
+            continue
+        rows.extend(_pit_histogram_rows(role, stat, tier, pit_all,
+                                         "piecewise-linear from sidecar q10/q50/q90"))
     return pd.DataFrame(rows)
 
 
 # ---------------------------------------------------------------- 8. biggest_misses (Marcel)
 
-def build_biggest_misses(runs: dict[tuple[int, str], MarcelRun], b: Bundle, k: int = 40) -> pd.DataFrame:
+def build_biggest_misses(runs: dict[tuple[int, str], MarcelRun], b: Bundle,
+                         sidecar: pd.DataFrame | None = None, k: int = 40) -> pd.DataFrame:
     people = b.people.set_index("mlbam_id")
     rows: list[dict] = []
     for (target, role), r in runs.items():
         if r is None:
             continue
         stat = KEY_STAT[role]
-        e = r.pred[stat].to_numpy() - r.actual[stat].to_numpy()
-        df = pd.DataFrame({"mlbam_id": r.ids, "pred": r.pred[stat].to_numpy(),
-                           "actual": r.actual[stat].to_numpy(),
-                           "abs_err": np.abs(e),
-                           "age": r.age.to_numpy(),
-                           "prior_pa": r.prior_pa.to_numpy(),
-                           "target_pa": r.pa.to_numpy()})
-        df = df.dropna(subset=["pred", "actual"]).sort_values("abs_err", ascending=False).head(k)
-        df["name"] = df.mlbam_id.map(people.get("name", pd.Series(dtype=object)))
-        df["role"] = role
-        df["tier"] = "marcel"
-        df["target"] = target
-        df["stat"] = stat
-        df["q10"] = np.nan
-        df["q90"] = np.nan
-        rows.extend(df[["target", "role", "tier", "stat", "mlbam_id", "name", "age",
-                        "prior_pa", "target_pa", "pred", "actual", "q10", "q90"]]
-                    .to_dict(orient="records"))
+        actual = r.actual[stat]
+        for tier, pred_df in _misses_pred_map(r, stat, sidecar, target, role).items():
+            joined = pred_df.copy()
+            joined["actual"] = actual.reindex(joined.index)
+            joined["abs_err"] = (joined["pred"] - joined["actual"]).abs()
+            joined["age"] = r.age.reindex(joined.index)
+            joined["prior_pa"] = r.prior_pa.reindex(joined.index)
+            joined["target_pa"] = r.pa.reindex(joined.index)
+            joined = (joined.dropna(subset=["pred", "actual"])
+                            .sort_values("abs_err", ascending=False).head(k))
+            joined["mlbam_id"] = joined.index
+            joined["name"] = joined.mlbam_id.map(people.get("name", pd.Series(dtype=object)))
+            joined["role"] = role
+            joined["tier"] = tier
+            joined["target"] = target
+            joined["stat"] = stat
+            rows.extend(joined[["target", "role", "tier", "stat", "mlbam_id", "name", "age",
+                                "prior_pa", "target_pa", "pred", "actual", "q10", "q90"]]
+                        .to_dict(orient="records"))
     return pd.DataFrame(rows)
+
+
+def _misses_pred_map(r: MarcelRun, stat: str, sidecar: pd.DataFrame | None,
+                     target: int, role: str) -> dict[str, pd.DataFrame]:
+    """{tier: DataFrame indexed by mlbam_id with columns pred, q10, q90}. Marcel always present;
+    Tier 2/3 added when the sidecar carries a matching stat."""
+    out: dict[str, pd.DataFrame] = {"marcel": pd.DataFrame({
+        "pred": r.pred[stat], "q10": np.nan, "q90": np.nan}, index=r.ids)}
+    if sidecar is None:
+        return out
+    for tier in ("tier2", "tier3"):
+        by_stat = _tier_pred_by_stat(sidecar, target, role, tier)
+        if stat in by_stat:
+            df = by_stat[stat]
+            out[tier] = pd.DataFrame({"pred": df["pred_mean"],
+                                      "q10": df["q10"], "q90": df["q90"]}, index=df.index)
+    return out
 
 
 # ---------------------------------------------------------------- 9. stage_correlations
@@ -478,7 +622,8 @@ def _summarise_py(path: Path) -> tuple[str, list[str]]:
 
 # ---------------------------------------------------------------- 12. CONTEXT.md
 
-def build_context_md(bt: dict, meta: dict, b: Bundle, counts: dict) -> str:
+def build_context_md(bt: dict, meta: dict, b: Bundle, counts: dict,
+                     sidecar_state: str = "missing") -> str:
     stages_meta = meta.get("stages") or {}
     prod = meta.get("production_tier") or {}
     coverage = _data_coverage_table(b)
@@ -566,25 +711,24 @@ def build_context_md(bt: dict, meta: dict, b: Bundle, counts: dict) -> str:
         "| file | rows | source | notes |",
         "|---|---:|---|---|",
         f"| backtest_summary.csv | {counts['backtest_summary']} | data/artifacts/backtest.json | complete |",
-        f"| posterior_summaries.csv | {counts['posterior_summaries']} | meta.json + backtest diag rows | tau/sigma_pop only for target=window_end; sd/ess/lam null |",
+        f"| posterior_summaries.csv | {counts['posterior_summaries']} | meta.json + backtest diag rows + sidecar (M1) | sidecar {sidecar_state} |",
         f"| aging_curves.csv | {counts['aging_curves']} | data/artifacts/aging.parquet | mean only; q10/q90 need per-draw sidecar |",
         f"| park_effects.csv | {counts['park_effects']} | meta.json top/bottom_hr_parks | phi_sd null; only top/bottom 3 for hr; other park stages absent |",
-        f"| residuals_by_bucket.csv | {counts['residuals_by_bucket']} | recomputed Marcel vs actuals | Tier 2/3 rows absent (need per-player pred store) |",
-        f"| pit_histograms.csv | {counts['pit_histograms']} | Marcel residuals, normal approx | Tier 2/3 PIT needs per-draw sidecar |",
-        f"| biggest_misses.csv | {counts['biggest_misses']} | recomputed Marcel key-stat errors | Tier 2/3 misses need per-player pred store |",
+        f"| residuals_by_bucket.csv | {counts['residuals_by_bucket']} | Marcel vs actuals + sidecar Tier 2/3 (M1) | sidecar {sidecar_state} |",
+        f"| pit_histograms.csv | {counts['pit_histograms']} | Marcel normal approx + sidecar piecewise Tier 2/3 (M1) | sidecar {sidecar_state} |",
+        f"| biggest_misses.csv | {counts['biggest_misses']} | Marcel + sidecar Tier 2/3 key-stat errors (M1) | sidecar {sidecar_state} |",
         f"| stage_correlations.csv | {counts['stage_correlations']} | observed residual rates in last window | proxy for talent correlation; not from posteriors |",
         f"| pt_summary.csv | {counts['pt_summary']} | Marcel PT vs actual for target={meta.get('window_end') - 1 if meta.get('window_end') else '-'} | includes share_zero_actual |",
         f"| code_map.md | 1 per file | walk of backend/keystone/ | |",
         "",
-        "### Gaps Fable can spec via HANDOFF.md",
+        "### Sidecar (M1)",
         "",
-        "Any Tier 2/3 per-player analysis (PIT, buckets, misses) needs backtest.py to persist a",
-        "sidecar. Suggested one-line spec: on each run write `backtest_predictions.parquet`",
-        "(target, role, tier, mlbam_id, stat, pred_mean, q10, q50, q90) and",
-        "`backtest_posteriors.parquet` (target, role, tier, stage, tau_mean, tau_sd, sigma_pop_*,",
-        "lam_*, sigma_age_*, park_sd_*, ess_bulk_min, max_rhat, divergences). Once that lands,",
-        "re-running `make backtest && make diagnostics` fills every column above without changing",
-        "this module's public shape.",
+        "`backtest_predictions.parquet` (target, role, tier, mlbam_id, stat, pred_mean, q10, q50,",
+        "q90) and `backtest_posteriors.parquet` (target, role, tier, stage, tau_mean, tau_sd,",
+        "sigma_pop_*, lam_*, sigma_age_*, park_sd_*, ess_bulk_min, max_rhat, divergences) are",
+        f"written next to backtest.json on every `make backtest`. Current status: **{sidecar_state}**.",
+        "When present, the sidecar fills the Tier 2/3 columns of the tables above; when absent,",
+        "diagnostics falls back to Marcel-only rows so `make diagnostics` never fails.",
         "",
         "## 8. Pointers into the code",
         "",
@@ -677,6 +821,11 @@ def run(out: Path, artifacts_dir: Path | None = None, processed_dir: Path | None
     if not meta:
         raise SystemExit(f"[diagnostics] missing {artifacts_dir/'meta.json'} — run `make project`")
 
+    preds_sidecar = _load_parquet(artifacts_dir / "backtest_predictions.parquet")
+    posts_sidecar = _load_parquet(artifacts_dir / "backtest_posteriors.parquet")
+    sidecar_state = "present" if preds_sidecar is not None else "missing"
+    print(f"[diagnostics] backtest sidecar: {sidecar_state}")
+
     b = load_bundle(processed_dir)
 
     # Marcel per-target predictions (cheap: no fits).
@@ -689,19 +838,19 @@ def run(out: Path, artifacts_dir: Path | None = None, processed_dir: Path | None
 
     frames = {
         "backtest_summary.csv": build_backtest_summary(bt),
-        "posterior_summaries.csv": build_posterior_summaries(bt, meta),
+        "posterior_summaries.csv": build_posterior_summaries(bt, meta, posts_sidecar),
         "aging_curves.csv": build_aging_curves(artifacts_dir),
         "park_effects.csv": build_park_effects(meta),
-        "residuals_by_bucket.csv": build_residuals_by_bucket(runs),
-        "pit_histograms.csv": build_pit_histograms(runs),
-        "biggest_misses.csv": build_biggest_misses(runs, b),
+        "residuals_by_bucket.csv": build_residuals_by_bucket(runs, preds_sidecar),
+        "pit_histograms.csv": build_pit_histograms(runs, preds_sidecar),
+        "biggest_misses.csv": build_biggest_misses(runs, b, preds_sidecar),
         "stage_correlations.csv": build_stage_correlations(b, meta.get("window_end") or C.SEASON_END),
         "pt_summary.csv": build_pt_summary(b, meta.get("window_end") or C.SEASON_END),
     }
     counts = {name.replace(".csv", ""): _write_csv(df, out / name) for name, df in frames.items()}
 
     (out / "code_map.md").write_text(build_code_map(backend_dir))
-    ctx = build_context_md(bt, meta, b, counts)
+    ctx = build_context_md(bt, meta, b, counts, sidecar_state)
     (out / "CONTEXT.md").write_text(ctx)
 
     line_count = ctx.count("\n")

@@ -241,6 +241,11 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         Intervals use <code>simulate_season</code> at each player's actual PA'/BF' (pitcher FIP
         uses actual IP).
       </p>
+      <p className="muted" style={{ fontSize: 12 }}>
+        As of M1, backtest scoring is park-aware: Tier 2/3 projections are evaluated in the
+        player's last-season park, matching the park information Marcel carries implicitly through
+        raw rates. See <code>backtest.json.park_aware_scoring</code>.
+      </p>
       {bt ? (
         <>
           <BacktestTable bt={bt} role="H" label="Hitters" />
