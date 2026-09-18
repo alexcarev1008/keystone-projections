@@ -255,6 +255,13 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         barrels/attempts for HR (both roles), 95+ mph BBE / attempts for hitter BABIP.
         target_accept moves to 0.95 to keep the funnel healthy.
       </p>
+      <p>
+        The Tier 3 indicator was built and backtested but did not earn a place in the
+        production projection (it lost to Tier 2 on points). The player-page waterfall
+        therefore shows the four steps that are actually in the shipped path — 3-year line,
+        regression to the mean, aging (which is also the neutral-park projection), and home
+        park.
+      </p>
 
       <h2>What the model learned</h2>
       <p>Stage parameters, hitters:</p>

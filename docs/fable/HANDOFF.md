@@ -119,7 +119,11 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   proceeds when flags match; it re-checks when the file changes mid-fit; and the CLI refuses
   end-to-end through the real `bt.run`. Mutation-checked: removing the writer guard or the CLI
   guard turns tests red. 49 pass._
-- [ ] (artifact check B, Opus-filed 2026-09-18, no modelling change) null waterfall steps render as
+- [ ] (artifact check B, Opus-filed 2026-09-18, no modelling change — part (a) DONE by Fable
+  2026-09-18 at Daniel's direction, differently than specced: Waterfall.tsx now filters null/
+  non-finite values AND hides steps 3/4 entirely (3 is all-NaN Tier 3, 4 ≡ step 2), folding
+  "neutral-park projection" into step 2's label; deltas re-derived from surviving rows; Methodology
+  states the shipped waterfall has four steps. Parts (b) and (c) remain open.) null waterfall steps render as
   0, and dead NaN rows ship in projections — see STATUS Results "Artifact check B". (a)
   `frontend/src/components/Waterfall.tsx`: skip steps whose `value` is null. Don't draw a bar or a
   `.000` value for them, and compute each delta sentence against the last non-null step, so
