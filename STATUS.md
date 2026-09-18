@@ -38,8 +38,8 @@
   - paste the printed RMSE table + gates back into a Fable session ("Results of `make backtest`: …").
     M1's pre-registered prediction (in M1_audit.md): H/hr RMSE → ~.0135, H/hr cov80 → ~.80,
     pitcher rows ~unchanged. Still do NOT run `make holdout`.
-  - If either role's tier2 gate flips to PASS, ping Opus to wire item 3 of HANDOFF.md (thread
-    `park_exposure_map` into `project.py` so shipped Tier 2 points match the validated scoring).
+  - Item 3 of HANDOFF.md is already wired (park-aware `project.py` — no-op under marcel-anchor,
+    kicks in the moment gates flip to tier2). No further action needed on that item.
 - **Smoke-test P5** (one terminal per line, no long job):
   - `make api` — FastAPI on :8000 against `data/artifacts/`.
   - `make web` — Vite dev server on :5173 (first run does `npm install`).
@@ -80,6 +80,28 @@ Ticked items 1, 2, 4 in `docs/fable/HANDOFF.md`; item 3 deferred (see below).
   without the sidecar on disk. Quick sidecar carries only H `stage_k`/`stage_hr` rows, so
   residuals_by_bucket etc. show non-Marcel rows only after Daniel's full re-run populates
   derived-stat predictions.
+
+### M1 item 3 — Opus (2026-09-17, code only, no long compute)
+Ticked at Daniel's direction ahead of the re-run: shipped in place so the moment a tier2 gate
+flips to PASS, `make project` picks up park-aware points automatically. No-op meanwhile.
+- **project.py.** `_home_park_exposure` (top-venue, share = 1) removed and replaced with
+  `park_exposure_map(b.exp[role], window_end)` — identical construction to `backtest.park_exposure_map`,
+  so shipped park exposure and validated park exposure are the same object. `StageFit` gains an
+  optional `P_park_aware` array (h=1..H) for `PARK_STAGES` only; non-park stages leave it None.
+- **What ships when.** `projections_frame` uses `P_park_aware` for park stages when it exists,
+  else `P_neutral`. Under `production_tier=marcel`, `_anchor_to_marcel` shifts all h=1 medians to
+  Marcel — since park exposure only adds a per-player logit constant and aging drift is
+  park-independent, park-aware and park-neutral produce identical shipped stats under the anchor.
+  When (if) tier2 gate PASSes, the anchor is bypassed and Coors hitters' hr_pct q50 rises.
+- **Waterfall.** Step 4 ("Neutral-park projection") still uses `P_neutral[:, 0, :]`; step 5
+  ("At home park") now uses `P_park_aware[:, 0, :]` (actual T-1 shares, so traded players get a
+  mixture) instead of the old top-venue-only h=1. Telescoping identity (step5 − step0 = Σ deltas)
+  is preserved by construction of the loop.
+- **Acceptance.** `make test` 31/31 pass; `make project --quick` completes, schema check passes,
+  and the new per-stage log confirms park-aware draws differ from neutral (H/hr h=1: mean Δ
+  -0.0001, max |Δ| 0.0022 at quick sampling — tiny because 200-player cap × 150 draws barely
+  learns the park effect; a full run will show the expected larger deltas). Coors-hitter q50
+  acceptance is inherently gated on tier2 shipping mode.
 
 ### M1 statistical red team — Fable (2026-09-17)
 Full findings: `docs/fable/M1_audit.md`. One root cause fixed, four findings for M2, rest clean.
@@ -424,15 +446,6 @@ Real modeling findings this run surfaces (write in the Methodology page):
    the most stable skills, where a hierarchical model should be at its strongest. Lower priority
    than 1 and 2, but it does not fit the "shrinkage helps unstable stats" story and may share a
    cause with 2 (H/bb is the second-largest divergence cluster, 47).
-
-## Questions for Daniel (Opus, 2026-09-17)
-- **Item 3 of HANDOFF.md is deferred**, because its trigger — a tier2 gate flip to PASS on the
-  re-run — hasn't fired yet. Two paths:
-  (a) Wait for your re-run and ping Opus if a gate flips (current plan).
-  (b) Do it now regardless: it's a no-op while `production_tier` stays `marcel` (the shift-to-
-      Marcel path in `project._anchor_to_marcel` runs on the neutral draws today), so wiring
-      park exposure has no shipped effect until a gate flips. Leaves less to do afterwards.
-  Preference?
 
 ## Blockers
 - none

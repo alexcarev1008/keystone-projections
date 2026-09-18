@@ -28,7 +28,7 @@ from keystone.components import (HITTER_STAGES, PARK_STAGES, PITCHER_STAGES,
                                  derive_hitter, derive_pitcher, pa_prime,
                                  per_pa_from_stage_rates, stage_counts)
 from keystone.data import statcast as SC
-from keystone.eval.backtest import Bundle, load_bundle
+from keystone.eval.backtest import Bundle, load_bundle, park_exposure_map
 from keystone.models import marcel as MARCEL
 from keystone.models import state_space as SS
 
@@ -128,26 +128,14 @@ def _cap_players_to_top(obs: pd.DataFrame, exp: pd.DataFrame | None, window_end:
     return obs2, exp2
 
 
-def _home_park_exposure(b: Bundle, role: str, window_end: int) -> dict:
-    """{mlbam_id: {venue_id: 0.5}} — send every player 'home' to the venue where he spent
-    the largest share in his most-recent season within the window."""
-    exp = b.exp[role]
-    exp = exp[exp.season <= window_end]
-    if exp.empty:
-        return {}
-    last_season = exp.groupby("mlbam_id")["season"].transform("max")
-    exp = exp[exp.season == last_season]
-    idx = exp.groupby("mlbam_id")["share"].idxmax()
-    top = exp.loc[idx, ["mlbam_id", "venue_id"]]
-    return {int(pid): {int(v): 0.5} for pid, v in zip(top.mlbam_id, top.venue_id)}
-
-
 @dataclass
 class StageFit:
     ids: np.ndarray                    # (n_players,) mlbam_id in projection order
     age_next: np.ndarray               # age at horizon 1
-    P_neutral: np.ndarray              # (n_players, horizons, n_draws)
-    P_home_h1: np.ndarray              # (n_players, n_draws) — h=1 at each player's home park
+    P_neutral: np.ndarray              # (n_players, horizons, n_draws) — park-neutral talent
+    P_park_aware: np.ndarray | None    # (n_players, horizons, n_draws) — park stages only;
+                                       # each player projected in his window_end park exposure
+                                       # (leakage-safe stand-in for the target season's park)
     venues: list[int]
     g_age: np.ndarray                  # posterior-mean g by age bucket (n_ages,)
     tau_mean: float
@@ -183,13 +171,11 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
     rng = np.random.default_rng(seed)
     players, P_neutral = SS.project(idata, d, horizons=horizons, mu_proj=mu_proj, rng=rng)
 
+    P_park_aware = None
     if stage in PARK_STAGES:
-        park_exp = _home_park_exposure(b, role, window_end)
-        _, P_home = SS.project(idata, d, horizons=1, mu_proj=mu_proj,
-                               rng=np.random.default_rng(seed), park_exposure=park_exp)
-        P_home_h1 = P_home[:, 0, :]
-    else:
-        P_home_h1 = P_neutral[:, 0, :]
+        park_exp = park_exposure_map(b.exp[role], window_end)
+        _, P_park_aware = SS.project(idata, d, horizons=horizons, mu_proj=mu_proj,
+                                     rng=np.random.default_rng(seed), park_exposure=park_exp)
 
     post = idata.posterior
     stack = lambda v: post[v].stack(s=("chain", "draw")).to_numpy()
@@ -203,16 +189,24 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
     flag = "  <-- CHECK" if rh is not None and rh > RHAT_WARN else ""
     print(f"  fit {role}/{stage}: {len(players)} players, max r_hat {rh}, "
           f"divergences {diag['divergences']}{flag}")
+    if P_park_aware is not None:
+        med_neu = np.median(P_neutral[:, 0, :], axis=-1)
+        med_park = np.median(P_park_aware[:, 0, :], axis=-1)
+        delta = med_park - med_neu
+        print(f"    park-aware h=1 median vs neutral: mean {float(delta.mean()):+.4f}, "
+              f"max |delta| {float(np.nanmax(np.abs(delta))):.4f} "
+              f"(shipping in tier2/tier3 mode, no-op under marcel-anchor)")
 
     fit = StageFit(ids=players.mlbam_id.to_numpy(dtype="int64"),
                    age_next=players.age_next.to_numpy(dtype="int64"),
                    P_neutral=np.asarray(P_neutral, dtype=np.float32),
-                   P_home_h1=np.asarray(P_home_h1, dtype=np.float32),
+                   P_park_aware=(np.asarray(P_park_aware, dtype=np.float32)
+                                 if P_park_aware is not None else None),
                    venues=list(d.venues), g_age=g_age, tau_mean=tau_mean,
                    sigma_pop_mean=sigma_pop_mean, park_sd_mean=park_sd_mean,
                    phi_mean=phi_mean, mu_proj=mu_proj,
                    max_rhat=rh, divergences=diag["divergences"])
-    del idata, model, d, P_neutral
+    del idata, model, d, P_neutral, P_park_aware
     gc.collect()
     return fit
 
@@ -242,11 +236,21 @@ def _align_stage_fits(fits: dict, stages: list[str]) -> np.ndarray:
     return common.to_numpy(dtype="int64")
 
 
-def _reindex_fit(fit: StageFit, ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Slice the fit's per-player arrays down to `ids`. Returns (P_neutral, P_home_h1) reordered."""
+def _reindex_fit(fit: StageFit, ids: np.ndarray) -> tuple[np.ndarray, np.ndarray | None]:
+    """Slice per-player arrays down to `ids`. Returns (P_neutral, P_park_aware) — the second
+    is None on stages the model didn't park-adjust (all pitcher stages, hitter K/BB/HBP)."""
     pos = pd.Series(np.arange(len(fit.ids)), index=fit.ids)
     take = pos.loc[ids].to_numpy()
-    return fit.P_neutral[take], fit.P_home_h1[take]
+    park = fit.P_park_aware[take] if fit.P_park_aware is not None else None
+    return fit.P_neutral[take], park
+
+
+def _ship_draws(P_neutral: np.ndarray, P_park_aware: np.ndarray | None,
+                stage: str) -> np.ndarray:
+    """The draws that ship: park-aware for park stages, neutral otherwise."""
+    if stage in PARK_STAGES and P_park_aware is not None:
+        return P_park_aware
+    return P_neutral
 
 
 def _anchor_to_marcel(P_neutral: np.ndarray, marcel_rate: np.ndarray) -> np.ndarray:
@@ -296,11 +300,12 @@ def projections_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dic
         stage_draws = {}
         partial = set(stages) != set(ROLE_STAGES[role])
         for stage in stages:
-            P_neutral, _ = _reindex_fit(role_fits[stage], ids)
+            P_neutral, P_park = _reindex_fit(role_fits[stage], ids)
+            P_ship = _ship_draws(P_neutral, P_park, stage)
             if prod_tier.get(role) == "marcel" and not partial:
-                stage_draws[stage] = _anchor_to_marcel(P_neutral, m_rates[stage].to_numpy())
+                stage_draws[stage] = _anchor_to_marcel(P_ship, m_rates[stage].to_numpy())
             else:
-                stage_draws[stage] = P_neutral
+                stage_draws[stage] = P_ship
 
         for h in range(1, horizons + 1):
             per_stage_h = {s: stage_draws[s][:, h - 1, :] for s in stages}
@@ -393,13 +398,13 @@ def waterfall_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dict,
         # Steps 1..5 require per-stage per-player draws. Build them.
         stage_neutral_h1 = {}          # (n_players, n_draws) at h=1 without aging
         stage_aged_h1 = {}             # h=1 with aging (= P_neutral[:, 0, :])
-        stage_home_h1 = {}
+        stage_home_h1 = {}             # h=1 at the player's window_end park exposure
         g_by_stage = {}
         for stage in stages:
             fit = role_fits[stage]
-            P_neu, P_home = _reindex_fit(fit, ids)
+            P_neu, P_park = _reindex_fit(fit, ids)
             stage_aged_h1[stage] = P_neu[:, 0, :]
-            stage_home_h1[stage] = P_home
+            stage_home_h1[stage] = P_park[:, 0, :] if P_park is not None else P_neu[:, 0, :]
             g_by_stage[stage] = fit.g_age
             # Undo aging: subtract g[age_next] in logit space to get "no-aging" version.
             eps = 1e-9

@@ -14,13 +14,14 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
 - [x] (M1) `backend/keystone/diagnostics.py` — read the sidecar when present and emit Tier 2/3 rows
   in residuals_by_bucket.csv, pit_histograms.csv (real posterior-predictive PIT), biggest_misses.csv,
   posterior_summaries.csv — ✔ `make diagnostics` runs green with and without the sidecar on disk.
-- [ ] (M1, only if a tier2 gate flips to PASS after the re-run) `backend/keystone/project.py` —
+- [x] (M1, only if a tier2 gate flips to PASS after the re-run) `backend/keystone/project.py` —
   thread park exposure into the production projection the same way the backtest now scores it:
   build `park_exposure_map(exposures, window_end)` (import from eval.backtest or move to
   state_space) and pass it to `SS.project` for PARK_STAGES, so shipped points match the validated
   configuration — ✔ a Coors hitter's hr_pct q50 > his park-neutral value; waterfall still telescopes.
-  _Deferred by Opus 2026-09-17: trigger condition (tier2 gate PASS) requires Daniel's re-run of
-  `make backtest` + `make backtest TIER=3` first. Asked in STATUS.md._
+  _Opus 2026-09-17: wired ahead of the re-run at Daniel's direction (no-op under the current
+  marcel-anchor). Coors-hitter acceptance is inherently gated on tier2 shipping mode and will
+  fire the first time gates flip; the mechanic is observable in `project`'s per-stage log line._
 - [x] (M1) `frontend/src/pages/Methodology.tsx` (Validation section) — one sentence: backtest
   scoring is park-aware as of M1 (Tier 2/3 projections evaluated in the player's last-season park,
   matching the park information Marcel carries implicitly); note `backtest.json.park_aware_scoring`
