@@ -296,7 +296,10 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         a Bayesian hurdle model fit per role: one part gives the chance a player gets any MLB time
         that season, and the other gives how much time he gets if he plays. Features are last
         year's and the year before's playing time, age and a missed-time proxy, plus starter
-        share for pitchers. The model is simulated forward four seasons, and a player can return
+        share for pitchers, plus a talent term: the playing-time-weighted wOBA (hitters) or
+        FIP-core (pitchers) gap to league over the last two seasons, shrunk by one full season
+        (600 PA / 180 IP) of league-average ballast. Talent is held fixed across the four
+        simulated seasons; aging enters only through the age terms. The model is simulated forward four seasons, and a player can return
         after missing a year. Per season it reports <code>p_play</code> (chance of any MLB time),
         expected PA/IP including the zero outcome, and the chance he is still a regular
         (≥ 300 PA / 100 IP).
@@ -315,12 +318,24 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         has checked their calibration.
       </p>
       <p>
+        <strong>Known artifact: optimism for old stars beyond year 1.</strong> Because teams give
+        good players playing time, a star coming off a short season projects high again at year 1
+        (e.g. Aaron Judge after 285 PA in 2026: 96% chance he plays, about 545 expected PA). At
+        h2–h4, expected playing time can <em>rise</em> with horizon: simulated healthy seasons
+        replace the depressed observed season while talent is held fixed and aging is only a mild
+        quadratic. Treat h2–h4 playing time for older stars as optimistic; it is model-implied,
+        not backtested.
+      </p>
+      <p>
         <strong>Validation (M3).</strong> On the same population and actuals, the hurdle beat
         Marcel playing time on RMSE in 8 of 8 dev targets (2021–2024; pre-registered gate ≥ 3 of 4
         per role). RMSE fell 25% for hitters and 11% for pitchers. Marcel's mean over-projection
         of about +126 PA / +22 IP per player-season fell to about +3 PA / +1 IP. The per-target
-        table is in <code>docs/fable/M3_playing_time.md</code> §3 and can be reproduced with{' '}
-        <code>make pt-backtest</code>. The 2025 holdout was not used.
+        table is in <code>docs/fable/M3_playing_time.md</code> §3. Adding the talent term
+        (pre-registered follow-up, §7) lowered RMSE again in 8 of 8 dev targets and moved the
+        bias for age ≥ 33 top-quartile-talent players toward zero in 4 of 4; the shipped model
+        includes it, and <code>make pt-backtest</code> reproduces the §7 numbers. The 2025
+        holdout was not used.
       </p>
 
       <h2>Validation</h2>

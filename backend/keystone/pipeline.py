@@ -82,7 +82,7 @@ def cmd_project(args: argparse.Namespace) -> None:
 
 
 def cmd_pt_backtest(args: argparse.Namespace) -> None:
-    """M3: rolling-origin PT hurdle vs Marcel PT on the dev targets (docs/fable/M3_playing_time.md §3)."""
+    """M3: rolling-origin PT hurdle (talent=True, §7) vs Marcel PT on the dev targets (docs/fable/M3_playing_time.md)."""
     import pandas as pd
 
     from keystone.eval.backtest import load_bundle
@@ -93,7 +93,7 @@ def cmd_pt_backtest(args: argparse.Namespace) -> None:
                  "(M3 §2 scores dev targets only)")
     b = load_bundle()
     ps = {r: b.ps[r] for r in args.roles}
-    res = PT.backtest_pt(ps, tuple(args.targets), seed=args.seed)
+    res = PT.backtest_pt(ps, tuple(args.targets), seed=args.seed, talent=True, guts=b.guts)
     wide = res.pivot_table(index=["role", "target"], columns="model",
                            values=["n", "rmse", "mae", "bias"])
     table = pd.DataFrame({

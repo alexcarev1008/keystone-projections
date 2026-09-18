@@ -68,8 +68,10 @@
      re-run writes `p_play`/`pt_expected`/`p_regular` into projections.parquet, and the player page's
      outlook picks them up. ~~Before shipping the outlook, read "Questions for Fable (M3 follow-up)"~~
      ANSWERED 2026-09-18: the talent covariate is accepted (M3_playing_time.md §7) and fixes the
-     Judge case (.17 → .94 p_play at 2030). **Opus: wire the new "(M3 follow-up T1)" HANDOFF item
-     before the `make project` re-run**, so the outlook ships with talent in the hurdle. Then M4.
+     Judge case (.17 → .94 p_play at 2030). ~~Opus: wire the new "(M3 follow-up T1)" HANDOFF item~~
+     DONE 2026-09-18 (`handoff: M3 follow-up talent covariate`). The `make project` re-run now ships
+     the outlook with talent in the hurdle. After it runs, check Judge (592450): h1 p_play > .9 and
+     pt_expected within ±35% of 545. Then M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -127,6 +129,17 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M3 follow-up T1 wire-up — Opus (2026-09-18, code + copy, one 92 s backtest)
+- `project.pt_outlook_frame`: `talent=True, guts=b.guts` on `PT.training_table` and `PT.build_pt_table`
+  (`fit_pt` picks up the talent column itself; `simulate_horizons` holds it fixed). `pipeline.cmd_pt_backtest`:
+  same kwargs on `PT.backtest_pt`, using the guts from the bundle it already loads. No model code touched.
+- `make pt-backtest` (92 s, seed 1): hurdle RMSE is H 154.057/135.666/138.204/139.099 and
+  P 34.856/34.849/33.574/36.642. That matches M3 §7's talent column on all 8 rows, and it beats Marcel 4/4 per role.
+- Methodology: the features paragraph describes the talent term. There is a new "known artifact: optimism for old stars
+  beyond year 1" paragraph (Judge h1 .96 / ~545, pt_expected can rise with horizon), and the "model-implied, not
+  backtested" label is kept. The validation paragraph cites the §7 result.
+- `make test` 62/62, `import keystone.project` OK, `npm run build` passes. Judge's acceptance check waits on `make project`.
 
 ### M3 PT hurdle backtest — Fable (2026-09-18, run locally, seed 1, dev targets only)
 Pre-registered gate: hurdle expected-PT RMSE < Marcel PT RMSE in ≥3/4 dev targets per role.

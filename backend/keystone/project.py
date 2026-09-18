@@ -682,8 +682,9 @@ def pt_outlook_frame(b: Bundle, roles: list[str], projection_season: int, horizo
     parts = []
     for role in roles:
         ps = b.ps[role]
-        fit = PT.fit_pt(PT.training_table(ps, role, projection_season), role, seed=seed)
-        table = PT.build_pt_table(ps, role, projection_season)
+        fit = PT.fit_pt(PT.training_table(ps, role, projection_season, talent=True, guts=b.guts),
+                        role, seed=seed)
+        table = PT.build_pt_table(ps, role, projection_season, talent=True, guts=b.guts)
         sim = PT.simulate_horizons(fit, table, horizons=horizons, seed=seed)
         parts.append(sim.assign(role=role))
         h1 = sim[sim.horizon == 1]
