@@ -27,7 +27,8 @@
   (.7770 vs tier2 .8190, Marcel .7986)** — evidence cross-stage information matters for P — but the GBM is
   2/4 vs Marcel (§6 gate FAIL) and the hybrid is unstable (2023 worst on board, ≤960 training rows), so
   **nothing ships; production unchanged**. README language in §7. No new runs for Daniel.
-- Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
+- [x] Phase 7 memo + README — Opus, 2026-09-18: `docs/research_memo.md`, `README.md`; M4 leakage
+  test wired (`tests/test_m4_leakage.py`, HANDOFF ticked). App + screenshot review: Daniel.
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -137,6 +138,19 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### Phase 7 write-up — Opus (2026-09-18, docs + one test, no compute)
+- `backend/tests/test_m4_leakage.py`: triples season-T counts + shifts season->=T league logits,
+  asserts `fit_predict_stage` (k, hr) is `np.array_equal` to the clean run. Mutation check: the
+  same perturbation without `train_slice` changes the predictions, so the test has teeth.
+- `docs/research_memo.md`: leads with pre-registration + the negative results (dev gates 2/4, 1/4;
+  2025 lost both key stats while winning 5/8 component rows → Marcel points + Tier 2 bands), then
+  component-chain rationale, M1–M4 changes, open problems (unbacktested h2–h4 bands, old-star
+  pt_expected rise, r_hat 1.16 / 89 div, correlated pitcher stages). Every number quoted from a
+  committed file with its source cited; per-year dev table read from `backtest.json`.
+- `README.md` (~95 lines): pitch, results table, stack + ASCII diagram, run commands, the 5
+  screenshots (note: taken 2026-09-17, pre-M2/M3 — Daniel may want fresh ones after `make project`),
+  limitations, next steps, link to memo. `make test` 63/63.
 
 ### M4 ML challenger — Fable (2026-09-18, all runs local ~15 min CPU, no Daniel compute)
 - Design pre-registered and committed (2f1db13) before any result. Same information set as tier2
