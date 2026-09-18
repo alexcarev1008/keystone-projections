@@ -120,6 +120,109 @@ PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --rp-effect --rol
 PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --innov t4 --out ../data/artifacts/m2/backtest_E4.json
 ```
 
-## M2b decisions
+## M2b decisions (2026-09-18, from `data/artifacts/m2/backtest_E2.json` + `backtest_E4.json`)
 
-(to be filled by M2b against the pre-registered expectations above — no goalpost moves)
+Headline (PA-weighted RMSE, mean 2021–2024): H wOBA marcel .0334 / base .0333 / E2 .0333 /
+E4 .0333; P FIP marcel .7947 / base .8223 / E2 .8201 / E4 .8241. Gates FAIL for every variant
+(H 2/4, P 1/4); production stays marcel.
+
+- **E2 — REJECT** against its pre-registered rule. FIP RMSE improved in only **2/4** targets
+  (2022 .8902→.8685, 2024 .7658→.7654; 2021 and 2023 worsened) vs the required ≥ 3/4. The
+  cov80 half **passed exactly as registered**: mean .732 → .755, into [0.75, 0.85]
+  (per-target .781/.714/.755/.771). H wOBA 2021 did not flip (.0341→.0340 vs marcel .0336).
+  The H k_pct bias sub-check is unverifiable from disk — the E4 run overwrote the m2/ sidecars
+  (single-slot sidecar naming; noted in HANDOFF). Mechanism read: the 2022 win is the
+  registered bias story working (dead-ball trend, recency helps); the 2021 loss is the same
+  weighting overcorrecting when the recent seasons mislead (2020 oddity + mid-2021 sticky-stuff
+  break). The *shock* half of E2 did all the calibration work and none of the damage — the
+  point-forecast half did the damage. Carried forward as E6.
+- **E3 — NOT JUDGED.** `backtest_E3.json` is not on disk; the SP/RP full run apparently never
+  completed. The change remains implemented and quick-validated; the full run goes back on
+  Daniel's queue unchanged. No verdict, no goalpost move.
+- **E4 — REJECT** against its pre-registered rule, with the most useful finding of the round.
+  tau_mean fell for all four registered stages (H/k .1232→.0913, H/bb .1293→.0935,
+  P/k .1457→.1070, P/bb .1204→.0873) ✓ — but the **chasing correlation did not move**
+  (H/k .033→.034, H/bb .032→.033, P/k .107→.108, P/bb .051→.051) ✗, bb_pct improved in
+  H 1/4, P 0/4 vs required ≥ 2/4 ✗, and P FIP slipped .8223→.8241 (H wOBA tied) — "improve or
+  tie" ✗. **Why tau fell without anything changing:** StudentT(4) has variance 2·tau², and the
+  fitted taus fell by almost exactly √2 (e.g. H/bb .0935·√2 = .132 ≈ .129). The innovation
+  *variance* is data-identified and was conserved; t4 relabelled the scale. The year-to-year
+  variance the model demands is real — the misspecification is that the random walk forces it
+  to be **persistent**. That redirects to E5. Geometry: divergences 429 → 172 (H/hit_bip
+  184→28, H/bb 94→29), most cluster r_hats down — far under the 2× reject threshold, a real
+  gain. **Not shipped in M2b** (the pre-registered rule has no geometry-only accept, and
+  swapping the innovation mid-M2b would change the baseline under E5/E6), but handed to M2c,
+  which owns sampler geometry: evaluate `--innov t4` as the default in the lock-in bundle,
+  where an accuracy-neutral change with cleaner geometry is worth adopting.
+- **On E2's calibration counting for anything:** under the gates as written, no. The gate is
+  accuracy AND coverage; P is 1/4 on accuracy, so cov80 .755 ships nothing by itself. But the
+  P gate can never pass without the coverage fix even if accuracy is solved, so the shock is a
+  necessary component of any path to a P gate PASS — which is exactly why it survives as E6
+  while E2 as a bundle is rejected.
+
+---
+
+## E5 — Transient season-level noise (flag `--obs-noise`) — M2b, pre-registered before any run
+
+- **Change.** `build_model(obs_noise=True)`: per observed player-season,
+  `logit_p += sigma_obs · eps`, eps ~ N(0,1) non-centred, `sigma_obs ~ HalfNormal(0.2)`.
+  `project` draws fresh transient noise per (player, horizon, draw) — added to the logit,
+  never to the talent walk, so it does not accumulate.
+- **Hypothesis.** E4 proved the year-to-year logit variance (~.12–.13 for k/bb) is
+  data-demanded but showed reshaping the walk can't help: the walk is the variance's only home,
+  so it is forced to be persistent, and the filter chases T-1 (M1-F4, M2a-3). A transient term
+  splits observed wiggle into drift (tau, persists) + season effects (sigma_obs, doesn't);
+  posterior theta then leans toward the multi-year mean — which is what Marcel's regression
+  gets right on BB%, the stablest skill in the sport and the only pitcher component tier2
+  loses (.0220 vs .0206, carrying 3× weight in FIP).
+- **Pre-registered expectation (full run).** tau falls materially (> 20%) for H/k, H/bb, P/k,
+  P/bb with sigma_obs clearly nonzero there (this time NOT variance relabelling — the
+  *effective* T-1 weight drops because eps absorbs the wiggle); chasing corr moves toward
+  Marcel's; **bb_pct RMSE improves for both roles in ≥ 2/4 targets**; P FIP mean RMSE improves
+  vs base .8223; H wOBA improves or ties; H wOBA cov80 stays in [.75, .85] (transient noise
+  widens intervals — overshoot > .85 is a registered failure). **Reject if** divergences > 2×
+  baseline (tau/sigma_obs/binomial variance partition may funnel) or if sigma_obs collapses
+  to ~0 (then the term is unidentified and the experiment is null).
+- **Decides.** §6 gate arithmetic on `backtest_E5.json`.
+- **Quick validation (pre-registered).** `--quick` H 2024 k+hr, seed 1, vs M2a's recorded
+  baseline quick (stage_k RMSE .0341, stage_hr .0172; tau H/k .1239, H/hr .1737): samples
+  cleanly (divergences ≤ baseline + 10 at quick scale); sigma_obs posterior mean > .03 for k;
+  tau H/k falls > 20%; stage_k RMSE ≤ .0345 (fits are re-sampled; small wiggle allowed).
+- **Quick result.** All checks pass. 0 divergences both stages; sigma_obs k = .0800 (sd .0122,
+  ~6.6 sd from 0), hr = .1335 (sd .0196); tau H/k .1239 → .0964 (−22%), H/hr .1737 → .1331
+  (−23%); stage_k RMSE .0341 → **.0338** (Marcel .0349), stage_hr .0172 → **.0169** (= Marcel).
+  Variance bookkeeping confirms the mechanism: .0964² + .0800² ≈ .1239² — the total year-to-year
+  variance is conserved (as E4 showed it must be) but .0064 of it is now transient and no longer
+  propagates into the projection. Goes to the full run.
+
+## E6 — Environment shock without the recency point (flag `--env-mode shock`) — M2b
+
+- **Change.** `fit_stage_draws`: mu_proj = baseline `projection_logit` (1/1/1 mean, untouched);
+  mu_sd = `projection_logit_recency`'s sigma_env (E2's yoy-volatility term). Fit untouched;
+  same seed ⇒ same fits as baseline. Pure scoring/interval delta.
+- **Hypothesis.** E2 decomposes: the shock produced the cov80 gain (.732→.755, the registered
+  target) and, being zero-mean, ~none of the RMSE movement; the recency point forecast produced
+  the 2022 win AND the 2021/2023 losses. Keep the validated half, drop the coin-flip half.
+- **Pre-registered expectation (full run, judged on `backtest_E5E6.json` vs `backtest_E5.json`).**
+  Fits identical to the E5-alone run (same seed); all RMSE within noise of E5-alone; P FIP
+  cov80 higher than E5-alone by roughly the E2 delta (~+.02), with the E5+E6 combination in
+  [0.75, 0.85] for both roles — overshoot > .85 is a registered failure of the combination.
+- **Decides.** Whether the shipping candidate is E5 or E5+E6.
+- **Quick validation (pre-registered).** `--quick` H 2024 k+hr, seed 1: runs green; tau
+  byte-equal to the plain baseline quick (pure scoring delta); stage RMSE within noise of .0341/.0172.
+- **Quick result.** All checks pass. tau k .1239 / hr .1737 — identical to the recorded
+  baseline quick (fits untouched); 0 divergences; stage_k .0338, stage_hr .0172 (within noise;
+  the k tick is the zero-mean shock's Jensen wiggle on the draw mean). Goes to the full run.
+
+## M2b full-run commands (Daniel; also in STATUS.md)
+
+```
+cd backend
+PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --rp-effect --roles P --out ../data/artifacts/m2/backtest_E3.json   # rerun — never completed
+PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --obs-noise --out ../data/artifacts/m2/backtest_E5.json
+PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --obs-noise --env-mode shock --out ../data/artifacts/m2/backtest_E5E6.json
+```
+
+E5 is judged vs base; E6's marginal effect is E5E6 vs E5. If E3 passes its (M2a) rule it is a
+candidate for the M2c lock-in bundle alongside whatever survives here — combinations are
+M2c's job, judged once, with the holdout still unspent.

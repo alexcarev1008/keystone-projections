@@ -233,7 +233,7 @@ def park_exposure_map(exposures: pd.DataFrame | None, window_end: int) -> dict:
             for p, g in e.groupby("mlbam_id")}
 
 
-_SCALAR_POP_PARAMS = ("tau", "sigma_pop", "lam", "sigma_age", "park_sd")
+_SCALAR_POP_PARAMS = ("tau", "sigma_pop", "lam", "sigma_age", "park_sd", "sigma_obs")
 
 
 def _diagnostics(idata) -> dict:
@@ -288,7 +288,8 @@ def _rp_share(ps_p: pd.DataFrame) -> pd.DataFrame:
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
                     indicator: pd.DataFrame | None = None, seed: int = 1,
                     park_aware: bool = True, env_mode: str = "mean3",
-                    rp_effect: bool = False, innov: str = "normal"):
+                    rp_effect: bool = False, innov: str = "normal",
+                    obs_noise: bool = False):
     """Fit one stage on the 6-season window ending at target-1.
 
     Returns (ids, draws, diagnostics) where draws is (n_players, n_draws): the h=1 talent
@@ -301,6 +302,8 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
       env_mode="recency"  E2: recency+size-weighted league forecast + common env shock in draws
       rp_effect=True      E3: SP/RP covariate on pitcher stages (ignored for role H)
       innov="t4"          E4: Student-t(4) talent innovations
+      env_mode="shock"    E6 (M2b): baseline mean3 point forecast + E2's env shock in draws
+      obs_noise=True      E5 (M2b): transient season-level logit noise (non-persistent)
     """
     window_end = target - 1
     window = (window_end - C.WINDOW_LEN + 1, window_end)
@@ -335,7 +338,7 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
 
     d = SS.build_stage_data(obs, window_end, exposures)
     model = SS.build_model(d, use_park=use_park, use_indicator=indicator is not None,
-                           innov=innov, use_role=use_role)
+                           innov=innov, use_role=use_role, obs_noise=obs_noise)
     idata = SS.fit(model, seed=seed, target_accept=0.95 if indicator is not None else 0.9,
                    **sampling)
     diag = _diagnostics(idata)
@@ -344,6 +347,10 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
         diag["delta_role_mean"], diag["delta_role_sd"] = float(arr.mean()), float(arr.std())
     if env_mode == "recency":
         mu_proj, mu_sd = LG.projection_logit_recency(train.lg[role], stage, window_end)
+    elif env_mode == "shock":
+        # E6: keep the baseline 1/1/1 point forecast, add only E2's validated env shock
+        mu_proj = LG.projection_logit(train.lg[role], stage, window_end)
+        _, mu_sd = LG.projection_logit_recency(train.lg[role], stage, window_end)
     else:
         mu_proj, mu_sd = LG.projection_logit(train.lg[role], stage, window_end), 0.0
     exposure = park_exposure_map(exposures, window_end) if (park_aware and use_park) else None
@@ -358,13 +365,15 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
 
 def tier_draws(train: Bundle, role: str, target: int, stages: list[str], sampling: dict,
                indicators: dict | None = None, seed: int = 1, park_aware: bool = True,
-               env_mode: str = "mean3", rp_effect: bool = False, innov: str = "normal"):
+               env_mode: str = "mean3", rp_effect: bool = False, innov: str = "normal",
+               obs_noise: bool = False):
     """Fit stages one at a time (memory — MANUAL §12) and align them on one player index."""
     raw, diags, ids_common = {}, {}, None
     for stage in stages:
         ids, draws, diag = fit_stage_draws(train, role, stage, target, sampling,
                                            (indicators or {}).get(stage), seed, park_aware,
-                                           env_mode=env_mode, rp_effect=rp_effect, innov=innov)
+                                           env_mode=env_mode, rp_effect=rp_effect, innov=innov,
+                                           obs_noise=obs_noise)
         raw[stage] = (ids, draws)
         diags[stage] = diag
         ids_common = pd.Index(ids) if ids_common is None else ids_common.intersection(ids)
@@ -482,6 +491,8 @@ def _sidecar_posteriors(target: int, role: str, tier_name: str, diags: dict) -> 
                      "sigma_age_sd": d.get("sigma_age_sd"),
                      "park_sd_mean": d.get("park_sd_mean"),
                      "park_sd_sd": d.get("park_sd_sd"),
+                     "sigma_obs_mean": d.get("sigma_obs_mean"),
+                     "sigma_obs_sd": d.get("sigma_obs_sd"),
                      "ess_bulk_min": d.get("ess_bulk_min"),
                      "max_rhat": d.get("max_rhat"),
                      "divergences": d.get("divergences")})
@@ -509,7 +520,8 @@ def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
                sampling: dict, seed: int = 1, park_aware: bool = True,
                env_mode: str = "mean3", rp_effect: bool = False,
-               innov: str = "normal") -> tuple[list[dict], list[dict], list[dict]]:
+               innov: str = "normal",
+               obs_noise: bool = False) -> tuple[list[dict], list[dict], list[dict]]:
     """Returns (score_rows, prediction_rows, posterior_rows). The last two feed the sidecar
     parquets; empty lists when no tier fit ran or the eval population is empty."""
     train = train_slice(b, target)
@@ -555,7 +567,8 @@ def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
               f"{stages} — running Tier 2 fits (labelled tier3)")
     ss_ids, P, diags = tier_draws(train, role, target, stages, sampling,
                                   indicators=indicators, seed=seed, park_aware=park_aware,
-                                  env_mode=env_mode, rp_effect=rp_effect, innov=innov)
+                                  env_mode=env_mode, rp_effect=rp_effect, innov=innov,
+                                  obs_noise=obs_noise)
 
     if set(stages) == set(ROLE_STAGES[role]):
         score(tier_name, pd.DataFrame({st: P[st].mean(axis=1) for st in P}, index=ss_ids),
@@ -717,7 +730,7 @@ PRED_SCHEMA = ["target", "role", "tier", "mlbam_id", "stat",
 POST_SCHEMA = ["target", "role", "tier", "stage",
                "tau_mean", "tau_sd", "sigma_pop_mean", "sigma_pop_sd",
                "lam_mean", "lam_sd", "sigma_age_mean", "sigma_age_sd",
-               "park_sd_mean", "park_sd_sd",
+               "park_sd_mean", "park_sd_sd", "sigma_obs_mean", "sigma_obs_sd",
                "ess_bulk_min", "max_rhat", "divergences"]
 
 
@@ -726,7 +739,7 @@ POST_SCHEMA = ["target", "role", "tier", "stage",
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
         out: Path | None = None, holdout: bool = False, seed: int = 1,
         park_aware: bool = True, env_mode: str = "mean3", rp_effect: bool = False,
-        innov: str = "normal") -> dict:
+        innov: str = "normal", obs_noise: bool = False) -> dict:
     mode = "quick" if quick else "dev"
     sampling = SAMPLING[mode]
     if quick:
@@ -740,7 +753,7 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     out = Path(out)
 
     b = load_bundle()
-    flags = dict(env_mode=env_mode, rp_effect=rp_effect, innov=innov)
+    flags = dict(env_mode=env_mode, rp_effect=rp_effect, innov=innov, obs_noise=obs_noise)
     print(f"[backtest] mode={mode} tier={tier} targets={targets} roles={roles} "
           f"sampling={sampling} park_aware={park_aware} flags={flags} -> {out.name}")
 
@@ -753,7 +766,7 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
             print(f"[backtest] target {target} role {role} stages {st}")
             r, p, po = run_target(b, role, target, tier, st, sampling, seed=seed,
                                   park_aware=park_aware, env_mode=env_mode,
-                                  rp_effect=rp_effect, innov=innov)
+                                  rp_effect=rp_effect, innov=innov, obs_noise=obs_noise)
             new_rows += r
             new_preds += p
             new_posts += po

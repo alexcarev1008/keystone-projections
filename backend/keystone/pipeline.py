@@ -60,7 +60,7 @@ def cmd_backtest(args: argparse.Namespace) -> None:
     bt.run(targets=args.targets, tier=args.tier, quick=args.quick, roles=args.roles,
            stages=args.stages, out=args.out, seed=args.seed,
            park_aware=not args.park_neutral, env_mode=args.env_mode,
-           rp_effect=args.rp_effect, innov=args.innov)
+           rp_effect=args.rp_effect, innov=args.innov, obs_noise=args.obs_noise)
 
 
 def cmd_project(args: argparse.Namespace) -> None:
@@ -137,12 +137,15 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--seed", type=int, default=1)
     k.add_argument("--park-neutral", action="store_true",
                    help="score Tier 2/3 with park-neutral projections (pre-M1 behaviour)")
-    k.add_argument("--env-mode", default="mean3", choices=("mean3", "recency"),
-                   help="M2a E2: league environment forecast (recency = weighted mean + env shock)")
+    k.add_argument("--env-mode", default="mean3", choices=("mean3", "recency", "shock"),
+                   help="M2a E2: league environment forecast (recency = weighted mean + env "
+                        "shock; shock = M2b E6, baseline mean3 point + env shock only)")
     k.add_argument("--rp-effect", action="store_true",
                    help="M2a E3: SP/RP covariate on pitcher stages")
     k.add_argument("--innov", default="normal", choices=("normal", "t4"),
                    help="M2a E4: talent innovation distribution")
+    k.add_argument("--obs-noise", action="store_true",
+                   help="M2b E5: transient season-level logit noise (non-persistent)")
     k.set_defaults(func=cmd_backtest)
 
     p = sub.add_parser("project", help="write production artifacts to data/artifacts/ (§7)")

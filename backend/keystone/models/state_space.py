@@ -87,7 +87,8 @@ def build_stage_data(obs: pd.DataFrame, window_end: int, exposures: pd.DataFrame
 
 
 def build_model(d: StageData, use_park: bool, use_indicator: bool = False,
-                innov: str = "normal", use_role: bool = False) -> pm.Model:
+                innov: str = "normal", use_role: bool = False,
+                obs_noise: bool = False) -> pm.Model:
     obs, st = d.obs, d.states
     n_ages = AGE_MAX - AGE_MIN + 1
     with pm.Model() as m:
@@ -124,6 +125,13 @@ def build_model(d: StageData, use_park: bool, use_indicator: bool = False,
         theta = pm.Deterministic("theta", C - pt.concatenate([pt.zeros(1), C])[st.start_idx.to_numpy()])
 
         logit_p = obs.mu_league.to_numpy() + theta[obs.state_idx.to_numpy()]
+        if obs_noise:
+            # M2b E5: transient season-level noise. Without it, every extra-binomial
+            # year-to-year wiggle must live in the persistent walk (inflating tau ->
+            # T-1 chasing); this term gives it a home that does not propagate.
+            sigma_obs = pm.HalfNormal("sigma_obs", 0.2)
+            eps = pm.Normal("eps_raw", 0.0, 1.0, shape=len(obs))
+            logit_p = logit_p + sigma_obs * eps
         if use_role:
             delta_role = pm.Normal("delta_role", 0.0, 0.5)
             logit_p = logit_p + delta_role * obs.x_role.to_numpy()
@@ -176,6 +184,9 @@ def project(idata, d: StageData, horizons: int, mu_proj: float, rng: np.random.G
     last = d.states[d.states.season == d.window_end]
     cur = th[last.index.to_numpy()]                      # (n_players, S)
     env_shock = mu_sd * rng.standard_normal(S) if mu_sd > 0 else 0.0
+    # transient season noise (E5): part of every realized season rate, but not persistent —
+    # drawn fresh per horizon and never added to the talent walk.
+    obs_sd = stack("sigma_obs") if "sigma_obs" in post else None
     role_term = 0.0
     if role_x is not None and "delta_role" in post:
         delta = stack("delta_role")
@@ -187,6 +198,8 @@ def project(idata, d: StageData, horizons: int, mu_proj: float, rng: np.random.G
     for h in range(1, horizons + 1):
         cur = cur + g[_age_bucket(last.age.to_numpy() + h)] + tau * step_noise()
         logit = mu_proj + env_shock + role_term + cur
+        if obs_sd is not None:
+            logit = logit + obs_sd * rng.standard_normal(cur.shape)
         if park_exposure is not None and "phi" in post:
             phi = stack("phi")
             vpos = {v: j for j, v in enumerate(d.venues)}

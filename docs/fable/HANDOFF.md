@@ -26,12 +26,23 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   scoring is park-aware as of M1 (Tier 2/3 projections evaluated in the player's last-season park,
   matching the park information Marcel carries implicitly); note `backtest.json.park_aware_scoring`
   — ✔ `npm run build` passes.
-- [ ] (M2a, BLOCKED until M2b accepts/rejects each experiment) `backend/keystone/project.py` —
-  thread whichever of the three M2a flags M2b accepts into the production pipeline, mirroring
-  `eval/backtest.fit_stage_draws`: `env_mode="recency"` → use `LG.projection_logit_recency` and
-  pass `mu_sd` to `SS.project`; `rp_effect` → merge `_rp_share` into the P obs frame (fillna +
-  centring identical to backtest) and pass `role_x`/`use_role`; `innov="t4"` → pass through to
-  `SS.build_model` and `SS.project`. Add matching `project` CLI flags defaulting to the accepted
-  configuration — ✔ `make project --quick` completes, schema check passes, and per-stage log shows
-  the flags; `make test` green.
+- [ ] (M2a, BLOCKED until M2c locks the config — M2b 2026-09-18 rejected E2 and E4 as bundles,
+  E3 unjudged pending its rerun, E5/E6 pending full runs) `backend/keystone/project.py` —
+  thread whichever flags survive into the production pipeline, mirroring
+  `eval/backtest.fit_stage_draws`. Candidates now: `rp_effect` → merge `_rp_share` into the P obs
+  frame (fillna + centring identical to backtest) and pass `role_x`/`use_role`;
+  `obs_noise` (E5) → pass to `SS.build_model` (sigma_obs is picked up by `SS.project`
+  automatically from the posterior); `env_mode="shock"` (E6) → mu_proj from
+  `LG.projection_logit`, mu_sd from `LG.projection_logit_recency`'s sigma_env, pass `mu_sd` to
+  `SS.project`; `innov="t4"` only if M2c adopts it for geometry. Add matching `project` CLI flags
+  defaulting to the accepted configuration — ✔ `make project --quick` completes, schema check
+  passes, and per-stage log shows the flags; `make test` green.
+- [ ] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
+  runs: `run()` writes `backtest_predictions{_quick}.parquet` / `backtest_posteriors{_quick}.parquet`
+  into `out.parent`, so consecutive `--out ../data/artifacts/m2/backtest_E*.json` runs overwrite
+  each other's sidecars (E2's were lost when E4 ran; it cost M2b one pre-registered sub-check).
+  When `out` is not the default `backtest{_quick}.json`, derive the sidecar names from the out
+  stem (e.g. `backtest_E5_predictions.parquet`) — ✔ two consecutive `--quick` runs with different
+  `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
+  default names so `make diagnostics` keeps working.
 

@@ -13,7 +13,7 @@
 ## Stage B — Fable missions (FABLE_MISSIONS.md) — $100 cap, revised 2026-09-17
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
-- [ ] M2b Judge + iterate ($20) → Daniel full backtests
+- [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
 - [ ] M2c Correlated stages / sampler geometry, lock config + `make holdout` ($15) → Opus wires → `make project diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
@@ -27,9 +27,26 @@
 |---|---|---|---|
 | M1 | $15 | ~$5 (Fable self-estimate) | ~$5 |
 | M2a | $20 | Daniel fills in (Fable self-estimate ~$8: input ~250k, output ~20k) | ~$13 |
+| M2b | $20 | Daniel fills in (Fable self-estimate ~$7: input ~220k, output ~18k) | ~$20 |
 
 ## Next command(s) for Daniel
-- **After Fable M2a (2026-09-17): run the three experiment backtests.** Each writes its own JSON +
+- **After Fable M2b (2026-09-18): run the three M2b backtests** (~50 + ~25 + ~50 min). E3's
+  original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
+  queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
+  `data/artifacts/m2/` (HANDOFF item filed) — if Opus hasn't fixed that yet, either run them
+  as-is (only the JSONs are strictly needed for M2c's judging) or copy the two
+  `backtest_*.parquet` files aside between runs. From the repo root:
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --rp-effect --roles P --out ../data/artifacts/m2/backtest_E3.json`
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --obs-noise --out ../data/artifacts/m2/backtest_E5.json`
+  - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --obs-noise --env-mode shock --out ../data/artifacts/m2/backtest_E5E6.json`
+  - paste each printed RMSE table + gates into a fresh Fable session to start **M2c**
+    ("Results of `<command>`: …"). Pre-registered accept/reject rules are in
+    `docs/fable/M2_experiments.md` (E3 under its M2a entry, E5/E6 under M2b) — no goalpost
+    moves. M2c judges these, attempts the correlated-stages/geometry upgrade (incl. deciding
+    `--innov t4` for geometry — see the M2b decisions), locks the config, and only then
+    `make holdout`. Still do NOT run `make holdout` before M2c says so.
+- **After Fable M2a (2026-09-17): run the three experiment backtests.** DONE for E2/E4
+  2026-09-18 (results below); E3 never completed — rerun folded into the M2b list above. Each writes its own JSON +
   sidecars under `data/artifacts/m2/` — `backtest.json`, the gates and the production tier are
   untouched until M2b accepts something. From the repo root (~50 + ~25 + ~60 min):
   - `cd backend && PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --env-mode recency --out ../data/artifacts/m2/backtest_E2.json`
@@ -70,6 +87,31 @@
 - **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M2b judge + iterate — Fable (2026-09-18)
+Full verdicts + new pre-registrations: `docs/fable/M2_experiments.md` §"M2b decisions".
+Judged E2/E4 full runs (E3's run never completed — rerun queued, no verdict). Gates still FAIL
+everywhere (H 2/4, P 1/4); production stays marcel.
+- **E2 REJECT** (rule: FIP better in ≥3/4 — got 2/4: 2022 .890→.869 big, 2024 tiny; 2021/2023
+  worse). Its cov80 half passed exactly as registered (.732→.755, into band). Decomposition:
+  the env *shock* did all the calibration work, the recency *point* forecast did all the damage
+  → shock carried forward alone as **E6 `--env-mode shock`** (fits untouched, interval-only).
+- **E4 REJECT** (tau fell ✓ but chasing corr unchanged, bb_pct H 1/4 / P 0/4 vs ≥2/4, FIP
+  .8223→.8241). Key finding: t(4) has variance 2τ², and fitted τ fell by almost exactly √2 —
+  the year-to-year variance is data-demanded and was *conserved*, just relabelled. The walk is
+  that variance's only home, so it's forced to be persistent → T-1 chasing (M1-F4). Geometry
+  gain is real (divergences 429→172, H/hit_bip 184→28): handed to M2c (owns geometry), not
+  shipped for accuracy.
+- **E5 `--obs-noise` (new)**: transient season-level logit noise sigma_obs·eps per player-season,
+  non-persistent (never enters the walk; projection draws it fresh per horizon). The direct fix
+  E4's finding points at: give the variance a non-persistent home so theta stops tracking
+  walk-rate noise Marcel regresses away. Targets BB% (only losing P component, 3× FIP weight).
+  Quick: 0 divergences, sigma_obs k=.080 (6.6 sd from 0), tau k −22% with total variance
+  conserved (.0964²+.080²≈.1239²), stage_k .0341→.0338, stage_hr .0172→.0169 (=Marcel) ✓.
+- **E6 quick**: fits byte-equal to baseline (tau .1239/.1737 identical), RMSE within noise ✓.
+- Tests 38/38 (3 new in `tests/test_m2b_experiments.py`). Also fixed: sigma_obs missing from
+  the posteriors sidecar row writer; filed HANDOFF item for sidecar filename collisions across
+  `--out` runs (cost E2 one sub-check). Fable self-estimate ~$7.
 
 ### M2a diagnose + build — Fable (2026-09-17)
 Full diagnosis + pre-registrations: `docs/fable/M2_experiments.md`. Post-M1 state: H wOBA tied
@@ -453,6 +495,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
 
 - 2026-09-17 — M1: backtest scores Tier 2/3 park stages in the player's T-1 park (park-aware) by default — park-neutral scoring handicapped only Tier 2 vs a park-inheriting Marcel; `--park-neutral` preserves the old behaviour; gates re-decided by Daniel's re-run, not edited by hand.
+- 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.
 - 2026-09-17 — M2a: three upgrades behind backtest flags, all default-off, pre-registered in `docs/fable/M2_experiments.md` before any run — E2 `--env-mode recency` (recency+size-weighted league forecast + common env shock in projection draws), E3 `--rp-effect` (SP/RP covariate on P stages, T-1 role projected forward), E4 `--innov t4` (Student-t(4) talent innovations, nu fixed, projection noise matched). Full runs write to `data/artifacts/m2/` so `backtest.json` and the gates stay untouched until M2b accepts; production `project.py` wiring is a HANDOFF item gated on M2b.
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
