@@ -20,7 +20,13 @@
   (real hurdle bias for H regulars, fixed by the same covariate; Marcel was wrong for P regulars)
   → 1 HANDOFF wiring item (talent=True + guts in project.py/pipeline.py + Methodology copy)
 - [x] M3 Playing time + attrition hurdle model ($20) — done 2026-09-18, see `docs/fable/M3_playing_time.md`: Bayesian hurdle (P(plays) × E[PT|plays]) **beats Marcel PT 8/8 dev targets on the pre-registered RMSE gate** (H −25%, P −11%; bias +42..+127 PA → ±7, +6..+22 IP → ±1.1); multi-year outlook defined as expected production (p_play × conditional) with `p_play`/`pt_expected`/`p_regular` per horizon → 3 HANDOFF items for Opus (artifacts, API/UI, CLI) — wired 2026-09-18 (`handoff: M3`); lands on the next `make project`
-- [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
+- [x] M4 ML challenger + formal model comparison ($10) — done 2026-09-18, see `docs/fable/M4_ml_challenger.md`:
+  HistGradientBoosting challenger + Bayesian+GBM hybrid, same information set, pre-registered rules.
+  **Hitters: the hierarchical model wins outright** (GBM 1/4 on points, 1/4 on CRPS; hybrid adds nothing).
+  **Pitchers: GBM beats tier2 FIP 3/4 on points AND CRPS (cov80 .83 in band); hybrid best of all on 2022–24
+  (.7770 vs tier2 .8190, Marcel .7986)** — evidence cross-stage information matters for P — but the GBM is
+  2/4 vs Marcel (§6 gate FAIL) and the hybrid is unstable (2023 worst on board, ≤960 training rows), so
+  **nothing ships; production unchanged**. README language in §7. No new runs for Daniel.
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
 
 ## Stage C — Opus final polish
@@ -35,6 +41,7 @@
 | M2c | $15 | Daniel fills in (Fable self-estimate ~$6: input ~200k, output ~12k) | ~$26 |
 | M3 | $20 | Daniel fills in (Fable self-estimate ~$4: input ~110k, output ~12k) | ~$30 |
 | M3 follow-up | $8 | Daniel fills in (Fable self-estimate ~$2: input ~90k, output ~8k) | ~$32 |
+| M4 | $10 | Daniel fills in (Fable self-estimate ~$3: input ~180k, output ~14k) | ~$35 |
 
 ## Next command(s) for Daniel
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
@@ -71,7 +78,8 @@
      Judge case (.17 → .94 p_play at 2030). ~~Opus: wire the new "(M3 follow-up T1)" HANDOFF item~~
      DONE 2026-09-18 (`handoff: M3 follow-up talent covariate`). The `make project` re-run now ships
      the outlook with talent in the hurdle. After it runs, check Judge (592450): h1 p_play > .9 and
-     pt_expected within ±35% of 545. Then M4.
+     pt_expected within ±35% of 545. ~~Then M4~~ — M4 DONE 2026-09-18, no Daniel runs needed
+     (all M4 compute ran locally in-session; nothing ships).
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -129,6 +137,23 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M4 ML challenger — Fable (2026-09-18, all runs local ~15 min CPU, no Daniel compute)
+- Design pre-registered and committed (2f1db13) before any result. Same information set as tier2
+  (train_slice guard; leakage perturbation check passes), same scoring path (Marcel RMSE reproduced
+  to 6 decimals), same eval population/weights. CRPS via MC draws; tier2 predictive reconstructed
+  split-normal from the sidecar quantiles + shared binomial noise (recon cov80 within .01 of reported).
+- Key stat, 4-target mean RMSE (gbm / tier2 / marcel): H wOBA .0333 / .0328 / .0334;
+  P FIP .7938 / .8131 / .7947. CRPS mean: H .0187 / .0183; P .4425 / .4531.
+- Verdicts vs pre-registered rules: H — A1/A2/A3 all FAIL (hierarchical model survives outright).
+  P — A1/A2/A3 all PASS, but §6 ship gate (≥3/4 vs Marcel) FAILS (2/4; Marcel-mean margin .0009
+  flips under the pre-registered sensitivity config). Hybrid P best on 2022–24 (.7770) yet worst
+  model of 2023 — unstable at ≤960 training rows. Nothing ships; production unchanged.
+- Finding worth keeping: the GBM's only informational edge is other stages' lag-1 deviations, and it
+  wins exactly (and only) on pitcher FIP — direct evidence for M2c's declined correlated-stages
+  hypothesis, now with numbers. Right next test: score GBM + hybrid once on 2026 targets, pre-registered.
+- Artifacts: `data/artifacts/m4/m4_results.json` (460 rows) + logs; code `eval/ml_challenger.py`,
+  `eval/m4_verdict.py`; full write-up `docs/fable/M4_ml_challenger.md`.
 
 ### M3 follow-up T1 wire-up — Opus (2026-09-18, code + copy, one 92 s backtest)
 - `project.pt_outlook_frame`: `talent=True, guts=b.guts` on `PT.training_table` and `PT.build_pt_table`

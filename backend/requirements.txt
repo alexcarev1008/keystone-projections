@@ -10,3 +10,4 @@ uvicorn[standard]>=0.30
 httpx2>=2.13                       # starlette TestClient dependency (needed for test_api.py)
 pybaseball==2.2.7
 pytest>=8
+scikit-learn>=1.6

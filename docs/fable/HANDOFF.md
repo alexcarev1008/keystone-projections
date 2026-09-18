@@ -142,6 +142,12 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   stem (e.g. `backtest_E5_predictions.parquet`) — ✔ two consecutive `--quick` runs with different
   `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
   default names so `make diagnostics` keeps working.
+- [ ] (M4, Fable-filed 2026-09-18, small, only if the challenger is ever revisited) add
+  `tests/test_m4_leakage.py`: perturb season-T rows + season-≥T league logits in a bundle copy and
+  assert `ml_challenger.fit_predict_stage` output is `np.array_equal` to the unperturbed run (mirror
+  of `test_backtest_leakage.py`; the manual check that passed is in M4_ml_challenger.md §5) — ✔ test
+  green in `make test`; no production code touched. Nothing else from M4 ships (verdict §7); the
+  Phase 7 README paragraph is pre-written in M4_ml_challenger.md §7.
 
 - [x] (M3 follow-up T1, Fable-filed 2026-09-18) Switch the PT hurdle to the accepted talent
   covariate (docs/fable/M3_playing_time.md §7 — ACCEPTED 8/8 vs the shipped hurdle). Two
