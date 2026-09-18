@@ -14,7 +14,7 @@
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
-- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wires 4 HANDOFF items → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
+- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wired the 3 holdout-blocking HANDOFF items 2026-09-18 (item 4, Methodology + meta docs, still open) → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -32,11 +32,12 @@
 
 ## Next command(s) for Daniel
 - **After Fable M2c (2026-09-18): the holdout, in this order.**
-  1. Opus wires the four unchecked M2c items in `docs/fable/HANDOFF.md`. The first three MUST
-     land before the holdout: today `make holdout` would score 2025 with the OLD config (the
-     holdout subcommand passes no experiment flags), and `backtest.json` must first become the
-     promoted E5E6 run (a file copy, no re-run — HANDOFF item 3).
-  2. `make holdout` — ONCE. (~15 min: one target year, both roles, locked config
+  1. ~~Opus wires the M2c HANDOFF items~~ DONE 2026-09-18 for the three that block the holdout
+     (locked flags are the default in `backtest`/`holdout`/`project`; E5E6 promoted to
+     `backtest.json`). Item 4 (Methodology + meta.json docs) is still open and doesn't block
+     the holdout. `make holdout` now refuses to run if its flags don't match
+     `backtest.json.experiment_flags`.
+  2. **← next:** `make holdout` — ONCE. (~15 min: one target year, both roles, locked config
      `--obs-noise --env-mode shock`.)
   3. Paste the printed 2025 table + gates back into the M2c Fable session ("Results of
      `make holdout`: …") so the result is recorded in M2_experiments.md and here, honestly,
@@ -98,9 +99,42 @@
 - P6.5 done (agent-only, no long compute); the context pack is at `docs/fable_context/`.
   Ready to launch **Fable M1** with the kickoff prompt in `FABLE_MISSIONS.md` §5.
 - Backlog long jobs: none.
-- **`make holdout` is now authorised — ONCE, after the first three M2c HANDOFF items land** (see the ordered list at the top of this section). Running it before the wiring scores 2025 with the wrong config and burns the one-shot.
+- **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M2c handoff wire-up — Opus (2026-09-18, code + file copy, no long compute)
+Ticked the first three M2c items in `docs/fable/HANDOFF.md`. Item 4 (Methodology + meta.json
+docs) is still open and doesn't block the holdout.
+- **project.py.** `fit_and_project_stage`/`run` default to the locked config, mirroring
+  `backtest.fit_stage_draws`: `obs_noise=True` → `SS.build_model` (SS.project picks sigma_obs up
+  from the posterior); `env_mode="shock"` keeps the mean3 `mu_proj` and passes recency's
+  sigma_env as `mu_sd` to both the neutral and the park-aware projection. No rp_effect, no t4.
+  r_hat now covers sigma_obs. Per-stage log: `config: obs_noise on (sigma_obs …), env_mode shock
+  (mu_sd …), tau …`. `project --no-obs-noise --env-mode mean3` restores the pre-M2 model.
+- **Defaults.** `backtest.py` (fit_stage_draws → run) and the `backtest` CLI default to
+  `--obs-noise --env-mode shock`, opt-outs `--no-obs-noise` / `--env-mode mean3` (the old
+  `--obs-noise` spelling still parses). `holdout` passes the locked flags explicitly and
+  **refuses** if they differ from `backtest.json.experiment_flags`.
+- **Promotion.** `m2/backtest_E5E6.json` → `backtest.json`, `m2/backtest_{predictions,posteriors}.parquet`
+  → `data/artifacts/` (byte-identical, all 14:05:35). The post-M1 baseline is archived as
+  `m2/backtest_base.json` + `m2/backtest_base_{predictions,posteriors}.parquet` (sidecars aren't
+  in git). `backtest.json` no longer carries the pre-M2 tier3 rows; its tier3 gate is "not evaluated".
+- **Acceptance.** `make test` 44/44 (6 new in `tests/test_m2c_locked_config.py`). `backtest
+  --quick`, no flags → `experiment_flags {env_mode: shock, rp_effect: false, innov: normal,
+  obs_noise: true}`, stage_k .0335 / stage_hr .0169 (Marcel .0349 / .0169). `project --quick`
+  completes, schema check OK, flags in the log. `--quick` emits no waterfall, so a scratch
+  7-stage hitter run (200 players, quick sampling, locked config): telescoping max |gap| 0 over
+  200 hitters. `make diagnostics` green off the promoted sidecars (context pack refreshed).
+  `/api/meta` → 200 with the new block (H 2/4 cov80 .819, P 1/4 .761, marcel/marcel). A dry
+  `holdout` against the real `backtest.json` (bt.run stubbed) passes the guard with the locked flags.
+- **Watch in `make project`:** quick-scale r_hat is higher with obs-noise: H/k 1.15 (pre-M2 quick
+  1.14), H/hr 1.27 (1.17), H/bb 1.30 in the 7-stage scratch run. Quick sampling is not a
+  convergence test (the E5E6 dev fits cut divergences 313 → 121), but read the full run's max r_hat.
+- **For Fable (observation, no change made):** each stage reseeds `default_rng(seed)` and draws the
+  env shock first, so every stage gets the same z per draw. That's true in the backtest too, so it
+  is what was validated. Env shocks are perfectly correlated across stages within a draw, and the
+  wOBA/FIP band widths inherit that assumption.
 
 ### M2c judge + lock — Fable (2026-09-18)
 Full verdicts: `docs/fable/M2_experiments.md` §"M2c decisions". Judged the three full runs:
@@ -487,15 +521,17 @@ Real modeling findings this run surfaces (write in the Methodology page):
   extremes), H/xbh 0.092, H/hit_bip 0.058, H/triple 0.257. Pitcher park effects are smaller
   because a pitcher's home games are half the total. Top/bottom 3 HR parks are in `meta.json`.
 
-## Gates / production tier (from `data/artifacts/backtest.json`, 2026-09-17)
-- **Hitters: Marcel** — Tier 2 fails: 0/4 targets beat Marcel on wOBA RMSE (need 3).
-  cov80 mean .759 ✓ in [0.75, 0.85], so hitters fail on accuracy only, not calibration.
-- **Pitchers: Marcel** — Tier 2 fails: 1/4 targets (2023 only) beat Marcel on FIP RMSE.
-  cov80 mean .726 ✗ below .75, so pitchers fail on both criteria; FIP intervals are a shade narrow.
+## Gates / production tier (from `data/artifacts/backtest.json` = promoted E5E6 run, 2026-09-18)
+- **Hitters: Marcel** — Tier 2 (locked config) fails on accuracy only: 2/4 targets beat Marcel
+  on wOBA RMSE (need 3), though the 4-year mean is better (.0328 vs .0334). cov80 .819 ✓.
+- **Pitchers: Marcel** — Tier 2 fails: 1/4 targets beat Marcel on FIP RMSE (mean .8164 vs
+  .7947). cov80 .761 ✓ — both roles in band for the first time.
 - Per MANUAL §6, production ships **Marcel points with Tier 2 bands**, and the Methodology page
-  must say so plainly.
-- Tier 3 not evaluated yet (Phase 6 regenerates gates with `--tier 3`).
-- Holdout 2025: **unspent**, deliberately (see Decisions).
+  must say so plainly. Bands, aging drift and waterfall come from the locked config after the
+  next `make project`.
+- Tier 3: not in the promoted file. It was last evaluated pre-M2 on the old config (FAIL for both
+  roles), and those rows are archived in `data/artifacts/m2/backtest_base.json`.
+- Holdout 2025: **unspent**, authorised once now (see Next commands).
 
 ## Decisions (one line each: date — decision — why)
 - 2026-09-17 — Fable budget re-split: cut the research-memo and hiring-manager-review missions (writing and judgement Daniel/Opus can do), moved the $30 into model research (M2 now 3 sessions, $55), playing time ($20) and a new ML-challenger mission ($10) — Fable is reserved for modelling and statistics only.
@@ -533,6 +569,9 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
 
 - 2026-09-17 — M1: backtest scores Tier 2/3 park stages in the player's T-1 park (park-aware) by default — park-neutral scoring handicapped only Tier 2 vs a park-inheriting Marcel; `--park-neutral` preserves the old behaviour; gates re-decided by Daniel's re-run, not edited by hand.
+- 2026-09-18 — M2c wiring: the locked config (obs-noise + env shock) is the default everywhere (`backtest.py` functions, the `backtest`/`holdout`/`project` CLIs, `project.py`) with opt-outs back to the pre-M2 model; `project` offers only shock/mean3 because recency was rejected.
+- 2026-09-18 — M2c wiring: `holdout` refuses to run unless its flags match `backtest.json.experiment_flags`. The holdout is one-shot, and a mismatch means scoring a model the gates weren't decided on (which the unwired holdout would have done).
+- 2026-09-18 — M2c promotion: the superseded post-M1 baseline backtest (JSON + untracked sidecars, incl. the pre-M2 tier3 rows) is archived under `data/artifacts/m2/backtest_base*` rather than discarded, because the M2 verdicts cite its numbers.
 - 2026-09-18 — M2c: production configuration locked = tier2 `--obs-noise --env-mode shock` (the `backtest_E5E6.json` run, seed 1) — E5 and E6 passed every pre-registered sub-check; E3 rejected (core sub-check unverifiable + r_hat 1.363 + gain subsumed by E5); `--innov t4` declined (relabelling reappears under obs-noise, no geometry win); correlated stages declined with reasons (weak observed corr, binding losses are regime errors, rebuild cost). Gates still FAIL → Marcel points + Tier 2 bands; holdout runs the locked config after Opus wires the flags.
 - 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.
 - 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.

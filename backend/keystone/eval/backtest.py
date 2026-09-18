@@ -287,9 +287,9 @@ def _rp_share(ps_p: pd.DataFrame) -> pd.DataFrame:
 
 def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling: dict,
                     indicator: pd.DataFrame | None = None, seed: int = 1,
-                    park_aware: bool = True, env_mode: str = "mean3",
+                    park_aware: bool = True, env_mode: str = "shock",
                     rp_effect: bool = False, innov: str = "normal",
-                    obs_noise: bool = False):
+                    obs_noise: bool = True):
     """Fit one stage on the 6-season window ending at target-1.
 
     Returns (ids, draws, diagnostics) where draws is (n_players, n_draws): the h=1 talent
@@ -298,7 +298,9 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
     raw rates, so a park-neutral Tier 2 would be scored against park-inflected actuals with a
     handicap Marcel does not carry. park_aware=False restores the neutral projection.
 
-    M2a experiment flags (docs/fable/M2_experiments.md):
+    Defaults are the M2c locked configuration (obs_noise=True, env_mode="shock"; innov normal,
+    no rp_effect). env_mode="mean3", obs_noise=False reproduce the pre-M2 baseline.
+    Experiment flags (docs/fable/M2_experiments.md):
       env_mode="recency"  E2: recency+size-weighted league forecast + common env shock in draws
       rp_effect=True      E3: SP/RP covariate on pitcher stages (ignored for role H)
       innov="t4"          E4: Student-t(4) talent innovations
@@ -365,8 +367,8 @@ def fit_stage_draws(train: Bundle, role: str, stage: str, target: int, sampling:
 
 def tier_draws(train: Bundle, role: str, target: int, stages: list[str], sampling: dict,
                indicators: dict | None = None, seed: int = 1, park_aware: bool = True,
-               env_mode: str = "mean3", rp_effect: bool = False, innov: str = "normal",
-               obs_noise: bool = False):
+               env_mode: str = "shock", rp_effect: bool = False, innov: str = "normal",
+               obs_noise: bool = True):
     """Fit stages one at a time (memory — MANUAL §12) and align them on one player index."""
     raw, diags, ids_common = {}, {}, None
     for stage in stages:
@@ -519,9 +521,9 @@ def tier3_indicators(role: str, stages: list[str], target: int) -> dict:
 
 def run_target(b: Bundle, role: str, target: int, tier: int, stages: list[str],
                sampling: dict, seed: int = 1, park_aware: bool = True,
-               env_mode: str = "mean3", rp_effect: bool = False,
+               env_mode: str = "shock", rp_effect: bool = False,
                innov: str = "normal",
-               obs_noise: bool = False) -> tuple[list[dict], list[dict], list[dict]]:
+               obs_noise: bool = True) -> tuple[list[dict], list[dict], list[dict]]:
     """Returns (score_rows, prediction_rows, posterior_rows). The last two feed the sidecar
     parquets; empty lists when no tier fit ran or the eval population is empty."""
     train = train_slice(b, target)
@@ -738,8 +740,8 @@ POST_SCHEMA = ["target", "role", "tier", "stage",
 
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
         out: Path | None = None, holdout: bool = False, seed: int = 1,
-        park_aware: bool = True, env_mode: str = "mean3", rp_effect: bool = False,
-        innov: str = "normal", obs_noise: bool = False) -> dict:
+        park_aware: bool = True, env_mode: str = "shock", rp_effect: bool = False,
+        innov: str = "normal", obs_noise: bool = True) -> dict:
     mode = "quick" if quick else "dev"
     sampling = SAMPLING[mode]
     if quick:

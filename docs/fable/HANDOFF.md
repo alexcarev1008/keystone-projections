@@ -26,7 +26,7 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   scoring is park-aware as of M1 (Tier 2/3 projections evaluated in the player's last-season park,
   matching the park information Marcel carries implicitly); note `backtest.json.park_aware_scoring`
   — ✔ `npm run build` passes.
-- [ ] (M2c, UNBLOCKED — locked config is `--obs-noise --env-mode shock`, innov normal, no
+- [x] (M2c, UNBLOCKED — locked config is `--obs-noise --env-mode shock`, innov normal, no
   rp-effect; see M2_experiments.md §M2c) `backend/keystone/project.py` — thread the locked
   flags into the production pipeline, mirroring `eval/backtest.fit_stage_draws`:
   `obs_noise=True` → pass to `SS.build_model` (sigma_obs is picked up by `SS.project`
@@ -35,19 +35,27 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   wire rp_effect or innov t4 (both rejected). Add `project` CLI flags defaulting to the locked
   configuration with opt-outs — ✔ `make project --quick` completes, schema check passes,
   per-stage log shows the flags, waterfall still telescopes (< .001); `make test` green.
-- [ ] (M2c, BEFORE Daniel's `make holdout`) `backend/keystone/pipeline.py` +
+  _Opus 2026-09-18: `fit_and_project_stage`/`run` take `obs_noise=True, env_mode="shock"`;
+  CLI `--obs-noise/--no-obs-noise`, `--env-mode {shock,mean3}` (recency not offered — rejected).
+  Telescoping checked on a 7-stage hitter run (200 players, quick sampling): max |gap| 0._
+- [x] (M2c, BEFORE Daniel's `make holdout`) `backend/keystone/pipeline.py` +
   `backend/keystone/eval/backtest.py` — make the locked config the default for `backtest` and
   `holdout`: `--obs-noise` default on (add `--no-obs-noise`), `--env-mode` default `shock`; the
   `holdout` subcommand currently passes no experiment flags to `bt.run`, so today it would score
   2025 with the OLD config — it must run the locked one — ✔ `backtest --quick` with no flags
   writes `experiment_flags: {env_mode: shock, obs_noise: true}` into the JSON; `make test` green.
-- [ ] (M2c, BEFORE Daniel's `make holdout`) promote the locked dev run to canonical:
+  _Opus 2026-09-18: also flipped the `backtest.py` function defaults (fit_stage_draws →
+  run). `holdout` passes the flags explicitly and refuses if they differ from
+  `backtest.json.experiment_flags`, so it can't score a config the gates weren't decided on._
+- [x] (M2c, BEFORE Daniel's `make holdout`) promote the locked dev run to canonical:
   copy `data/artifacts/m2/backtest_E5E6.json` → `data/artifacts/backtest.json` and
   `data/artifacts/m2/backtest_{predictions,posteriors}.parquet` (timestamps 14:05, they are the
   E5E6 run's) → `data/artifacts/` — this IS the full dev backtest under the locked config
   (seed 1), so no ~50-min re-run is needed; gates in the file: H FAIL 2/4 cov80 .820,
   P FAIL 1/4 cov80 .761, production_tier marcel/marcel — ✔ `make diagnostics` runs green off
   the promoted sidecars; `/api/meta` serves the new backtest block.
+  _Opus 2026-09-18: copies are byte-identical to the m2 files. The superseded post-M1 baseline
+  (incl. its pre-M2 tier3 rows) is archived as `m2/backtest_base{,_predictions,_posteriors}.*`._
 - [ ] (M2c) `frontend/src/pages/Methodology.tsx` + `backend/keystone/project.py` meta writer —
   document the locked model: (a) state-space section gains two sentences: a transient
   season-level noise term (sigma_obs, non-persistent, fitted per stage) separates single-season

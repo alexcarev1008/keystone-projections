@@ -12,6 +12,15 @@ from keystone.data import build as build_mod
 from keystone.data import mlb_api
 
 
+def _add_model_config_flags(p: argparse.ArgumentParser, env_modes: tuple[str, ...],
+                            env_help: str) -> None:
+    """M2c locked configuration (docs/fable/M2_experiments.md) as the default, with opt-outs."""
+    p.add_argument("--obs-noise", action=argparse.BooleanOptionalAction, default=True,
+                   help="M2b E5: transient season-level logit noise (locked default: on; "
+                        "--no-obs-noise = pre-M2 model)")
+    p.add_argument("--env-mode", default="shock", choices=env_modes, help=env_help)
+
+
 def _seasons(start: int, end: int) -> list[int]:
     if start > end:
         raise SystemExit(f"--start ({start}) must be <= --end ({end})")
@@ -68,7 +77,8 @@ def cmd_project(args: argparse.Namespace) -> None:
 
     C.ensure_dirs()
     proj.run(window_end=args.window_end, horizons=args.horizons, quick=args.quick,
-             out=args.out, seed=args.seed, tier=args.tier)
+             out=args.out, seed=args.seed, tier=args.tier, obs_noise=args.obs_noise,
+             env_mode=args.env_mode)
 
 
 def cmd_statcast(args: argparse.Namespace) -> None:
@@ -108,7 +118,17 @@ def cmd_holdout(args: argparse.Namespace) -> None:
     if prev.get("holdout_target") is not None and not args.force:
         sys.exit(f"[holdout] already run on {prev['holdout_target']}. The holdout is a one-shot "
                  f"by design; pass --force only if you know why.")
-    bt.run(targets=[args.target], tier=args.tier, out=path, holdout=True, seed=args.seed)
+    # Score the holdout with exactly the model the dev gates were decided on.
+    flags = dict(env_mode=args.env_mode, rp_effect=False, innov="normal",
+                 obs_noise=args.obs_noise)
+    dev_flags = prev.get("experiment_flags") or {}
+    if {k: dev_flags.get(k) for k in flags} != flags:
+        sys.exit(f"[holdout] model config {flags} does not match the dev backtest in {path.name} "
+                 f"(experiment_flags {prev.get('experiment_flags')}). Promote the matching dev run "
+                 f"to {path.name} first — the holdout must score the configuration the gates "
+                 f"were decided on.")
+    bt.run(targets=[args.target], tier=args.tier, out=path, holdout=True, seed=args.seed,
+           **flags)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -137,15 +157,14 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--seed", type=int, default=1)
     k.add_argument("--park-neutral", action="store_true",
                    help="score Tier 2/3 with park-neutral projections (pre-M1 behaviour)")
-    k.add_argument("--env-mode", default="mean3", choices=("mean3", "recency", "shock"),
-                   help="M2a E2: league environment forecast (recency = weighted mean + env "
-                        "shock; shock = M2b E6, baseline mean3 point + env shock only)")
+    _add_model_config_flags(
+        k, ("shock", "mean3", "recency"),
+        "league environment forecast (locked default: shock = M2b E6, mean3 point + env shock; "
+        "mean3 = pre-M2, no shock; recency = M2a E2, rejected)")
     k.add_argument("--rp-effect", action="store_true",
-                   help="M2a E3: SP/RP covariate on pitcher stages")
+                   help="M2a E3: SP/RP covariate on pitcher stages (rejected in M2c)")
     k.add_argument("--innov", default="normal", choices=("normal", "t4"),
-                   help="M2a E4: talent innovation distribution")
-    k.add_argument("--obs-noise", action="store_true",
-                   help="M2b E5: transient season-level logit noise (non-persistent)")
+                   help="M2a E4: talent innovation distribution (t4 rejected in M2c)")
     k.set_defaults(func=cmd_backtest)
 
     p = sub.add_parser("project", help="write production artifacts to data/artifacts/ (§7)")
@@ -157,6 +176,9 @@ def main(argv: list[str] | None = None) -> None:
                    help="smoke test: hitters, 200 players, 2 stages, 150 draws")
     p.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
     p.add_argument("--seed", type=int, default=1)
+    _add_model_config_flags(p, ("shock", "mean3"),
+                            "league environment forecast (locked default: shock = mean3 point + "
+                            "env shock in the draws; mean3 = pre-M2, no shock)")
     p.set_defaults(func=cmd_project)
 
     sc = sub.add_parser("statcast", help="fetch Savant leaderboards and write statcast_{H,P}.parquet")
@@ -175,6 +197,9 @@ def main(argv: list[str] | None = None) -> None:
     h.add_argument("--out", type=lambda s: __import__("pathlib").Path(s), default=None)
     h.add_argument("--seed", type=int, default=1)
     h.add_argument("--force", action="store_true")
+    _add_model_config_flags(h, ("shock", "mean3"),
+                            "league environment forecast (locked default: shock); must match "
+                            "backtest.json's experiment_flags")
     h.set_defaults(func=cmd_holdout)
 
     args = ap.parse_args(argv)

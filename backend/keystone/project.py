@@ -1,7 +1,8 @@
 """Production artifacts (MANUAL.md §7): writes the parquet + meta.json set the API serves.
 
-At `window_end` (default 2026) fits Tier 2 once per (role, stage), projects h = 1..4 seasons,
-runs Marcel at target = window_end + 1, and combines them per the gate in `backtest.json`:
+At `window_end` (default 2026) fits Tier 2 once per (role, stage) in the M2c locked configuration
+(obs-noise + env shock, see `fit_and_project_stage`), projects h = 1..4 seasons, runs Marcel at
+target = window_end + 1, and combines them per the gate in `backtest.json`:
   * `tier2`/`tier3` -> use its own draws directly.
   * `marcel`        -> §6 fallback: shift Tier 2 stage draws in logit space so their h=1 median
                        lands on Marcel's h=1 rate. Bands still come from Tier 2's spread; the
@@ -103,7 +104,8 @@ def _stage_obs(b: Bundle, role: str, stage: str, window: tuple[int, int]) -> pd.
 
 
 def _diagnostics(idata) -> dict:
-    names = [v for v in ("tau", "sigma_pop", "lam", "sigma_age", "g0", "park_sd") if v in idata.posterior]
+    names = [v for v in ("tau", "sigma_pop", "lam", "sigma_age", "g0", "park_sd", "sigma_obs")
+             if v in idata.posterior]
     max_rhat = None
     if idata.posterior.sizes.get("chain", 1) > 1:
         r = az.rhat(idata, var_names=names)
@@ -149,7 +151,16 @@ class StageFit:
 
 def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, horizons: int,
                            sampling: dict, seed: int, cap: int | None,
-                           indicator: pd.DataFrame | None = None) -> StageFit:
+                           indicator: pd.DataFrame | None = None, obs_noise: bool = True,
+                           env_mode: str = "shock") -> StageFit:
+    """Fit one stage at window_end and project h = 1..horizons.
+
+    Defaults are the M2c locked configuration (docs/fable/M2_experiments.md), mirroring
+    `eval.backtest.fit_stage_draws` so shipped draws match the validated ones:
+      obs_noise=True    E5: transient season-level logit noise; SS.project draws it per horizon
+      env_mode="shock"  E6: mean3 point forecast + a common league-environment shock (sigma_env)
+    obs_noise=False / env_mode="mean3" restore the pre-M2 model.
+    """
     window = (window_end - C.WINDOW_LEN + 1, window_end)
     obs = _stage_obs(b, role, stage, window)
     if indicator is not None:
@@ -162,20 +173,32 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
     if cap is not None:
         obs, exp = _cap_players_to_top(obs, exp, window_end, cap)
 
+    mu_proj = LG.projection_logit(b.lg[role], stage, window_end)
+    if env_mode == "shock":
+        _, mu_sd = LG.projection_logit_recency(b.lg[role], stage, window_end)
+    elif env_mode == "mean3":
+        mu_sd = 0.0
+    else:
+        raise ValueError(f"unknown env_mode {env_mode!r} (production supports shock, mean3)")
+
     d = SS.build_stage_data(obs, window_end, exp)
-    model = SS.build_model(d, use_park=(stage in PARK_STAGES), use_indicator=indicator is not None)
+    model = SS.build_model(d, use_park=(stage in PARK_STAGES), use_indicator=indicator is not None,
+                           obs_noise=obs_noise)
     idata = SS.fit(model, seed=seed, target_accept=0.95 if indicator is not None else 0.9, **sampling)
     diag = _diagnostics(idata)
-    mu_proj = LG.projection_logit(b.lg[role], stage, window_end)
 
+    # Both projections reseed identically, so park-aware and neutral draws share every env
+    # shock / walk step / season-noise draw and differ only by the park term.
     rng = np.random.default_rng(seed)
-    players, P_neutral = SS.project(idata, d, horizons=horizons, mu_proj=mu_proj, rng=rng)
+    players, P_neutral = SS.project(idata, d, horizons=horizons, mu_proj=mu_proj, rng=rng,
+                                    mu_sd=mu_sd)
 
     P_park_aware = None
     if stage in PARK_STAGES:
         park_exp = park_exposure_map(b.exp[role], window_end)
         _, P_park_aware = SS.project(idata, d, horizons=horizons, mu_proj=mu_proj,
-                                     rng=np.random.default_rng(seed), park_exposure=park_exp)
+                                     rng=np.random.default_rng(seed), park_exposure=park_exp,
+                                     mu_sd=mu_sd)
 
     post = idata.posterior
     stack = lambda v: post[v].stack(s=("chain", "draw")).to_numpy()
@@ -184,11 +207,15 @@ def fit_and_project_stage(b: Bundle, role: str, stage: str, window_end: int, hor
     sigma_pop_mean = float(stack("sigma_pop").mean())
     park_sd_mean = float(stack("park_sd").mean()) if "park_sd" in post else None
     phi_mean = stack("phi").mean(axis=-1) if "phi" in post else None
+    sigma_obs_mean = float(stack("sigma_obs").mean()) if "sigma_obs" in post else None
 
     rh = diag["max_rhat"]
     flag = "  <-- CHECK" if rh is not None and rh > RHAT_WARN else ""
+    obs_txt = f"on (sigma_obs {sigma_obs_mean:.3f})" if sigma_obs_mean is not None else "off"
     print(f"  fit {role}/{stage}: {len(players)} players, max r_hat {rh}, "
           f"divergences {diag['divergences']}{flag}")
+    print(f"    config: obs_noise {obs_txt}, env_mode {env_mode} (mu_sd {mu_sd:.4f}), "
+          f"tau {tau_mean:.4f}")
     if P_park_aware is not None:
         med_neu = np.median(P_neutral[:, 0, :], axis=-1)
         med_park = np.median(P_park_aware[:, 0, :], axis=-1)
@@ -729,7 +756,8 @@ def projection_population(b: Bundle, role: str, window_end: int) -> np.ndarray:
 # ---------------------------------------------------------------- entry
 
 def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
-        out: Path | None = None, seed: int = 1, tier: int | None = None) -> None:
+        out: Path | None = None, seed: int = 1, tier: int | None = None,
+        obs_noise: bool = True, env_mode: str = "shock") -> None:
     if out is None:
         # --quick smoke tests write to a sibling dir so they never overwrite production artifacts.
         out = C.ARTIFACTS / "_quick" if quick else C.ARTIFACTS
@@ -756,7 +784,8 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
         prod_tier = {r: "tier3" for r in roles}
     fit_tier = tier or (3 if any(v == "tier3" for v in prod_tier.values()) else 2)
     print(f"[project] window_end={window_end} horizons={horizons} quick={quick} "
-          f"sampling={sampling} production_tier={prod_tier} fit_tier={fit_tier}")
+          f"sampling={sampling} production_tier={prod_tier} fit_tier={fit_tier} "
+          f"obs_noise={obs_noise} env_mode={env_mode}")
 
     fits: dict = {}
     for role in roles:
@@ -765,7 +794,8 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
             if fit_tier == 3 and ind is not None:
                 ind = ind[ind.season <= window_end].reset_index(drop=True)
             fits[(role, stage)] = fit_and_project_stage(
-                b, role, stage, window_end, horizons, sampling, seed, cap, indicator=ind)
+                b, role, stage, window_end, horizons, sampling, seed, cap, indicator=ind,
+                obs_noise=obs_noise, env_mode=env_mode)
 
     marcel_rates = {role: _marcel_stage_rates(b, role, window_end + 1) for role in roles}
     marcel_pt = {role: _marcel_pt(b, role, window_end + 1) for role in roles}
