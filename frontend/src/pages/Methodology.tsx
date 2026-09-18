@@ -290,6 +290,39 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         Sampler health across production fits: max r̂ = {meta.max_rhat?.toFixed(3)}, total divergences = {meta.total_divergences}.
       </p>
 
+      <h2>Playing time and the multi-year outlook</h2>
+      <p>
+        Headline PA/IP and the leaderboard still use Marcel playing time. The multi-year outlook uses
+        a Bayesian hurdle model fit per role: one part gives the chance a player gets any MLB time
+        that season, and the other gives how much time he gets if he plays. Features are last
+        year's and the year before's playing time, age and a missed-time proxy, plus starter
+        share for pitchers. The model is simulated forward four seasons, and a player can return
+        after missing a year. Per season it reports <code>p_play</code> (chance of any MLB time),
+        expected PA/IP including the zero outcome, and the chance he is still a regular
+        (≥ 300 PA / 100 IP).
+      </p>
+      <p>
+        <strong>Expected production = P(plays) × the conditional projection.</strong> Counting stats
+        scale by expected playing time. Rate stats are unchanged, and the player page labels them
+        with the chance he plays. This assumes playing time and rate are independent given the
+        covariates. That is wrong in detail: players who lose time are usually declining. So
+        expected counting production is still slightly optimistic for decliners. The line
+        labelled "if he plays" keeps its meaning of conditional on playing.
+      </p>
+      <p>
+        <strong>Beyond year 1, intervals are model-implied, not backtested.</strong> The backtest
+        scores horizon 1 only. The h2–h4 bands follow from the fitted talent drift, and nothing
+        has checked their calibration.
+      </p>
+      <p>
+        <strong>Validation (M3).</strong> On the same population and actuals, the hurdle beat
+        Marcel playing time on RMSE in 8 of 8 dev targets (2021–2024; pre-registered gate ≥ 3 of 4
+        per role). RMSE fell 25% for hitters and 11% for pitchers. Marcel's mean over-projection
+        of about +126 PA / +22 IP per player-season fell to about +3 PA / +1 IP. The per-target
+        table is in <code>docs/fable/M3_playing_time.md</code> §3 and can be reproduced with{' '}
+        <code>make pt-backtest</code>. The 2025 holdout was not used.
+      </p>
+
       <h2>Validation</h2>
       <p>
         Rolling-origin backtests on {devSpan} (window_end = T−1). Point projections are Tier 2/3
@@ -342,9 +375,9 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
 
       <h2>Limitations</h2>
       <ul>
-        <li>Playing time comes from Marcel — no attrition or role-change model.</li>
+        <li>Headline playing time is Marcel's. Attrition enters only through the multi-year outlook's hurdle model, which has no role-change or injury-report information.</li>
         <li>Stages are fit independently; between-stage correlation is ignored when combining.</li>
-        <li>Projections are park-neutral and conditional on the player playing.</li>
+        <li>Projections are park-neutral. Rate projections are conditional on the player playing; the outlook's "expected" line is not.</li>
         <li>Survivor bias: the eval population is players with ≥ 200 PA'/BF' in T and any prior history.</li>
         <li>2026 data is through {meta.data_through} — the season is not complete; artifacts should be re-run after the regular season ends.</li>
       </ul>

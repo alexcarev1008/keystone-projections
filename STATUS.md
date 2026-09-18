@@ -15,7 +15,7 @@
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
 - [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → holdout attempt 1 misfired (ruled invalid) → Opus repaired state + writer guard → **holdout attempt 2 run + recorded, SPENT: tier2 beats Marcel on neither key stat (H wOBA .0309 vs .0305, P FIP .7399 vs .7317) but cov80 in band both (.83/.75) — M2 closed.** Remaining: `make project`, `make diagnostics` (HANDOFF item 4 done)
-- [x] M3 Playing time + attrition hurdle model ($20) — done 2026-09-18, see `docs/fable/M3_playing_time.md`: Bayesian hurdle (P(plays) × E[PT|plays]) **beats Marcel PT 8/8 dev targets on the pre-registered RMSE gate** (H −25%, P −11%; bias +42..+127 PA → ±7, +6..+22 IP → ±1.1); multi-year outlook defined as expected production (p_play × conditional) with `p_play`/`pt_expected`/`p_regular` per horizon → 3 HANDOFF items for Opus (artifacts, API/UI, CLI)
+- [x] M3 Playing time + attrition hurdle model ($20) — done 2026-09-18, see `docs/fable/M3_playing_time.md`: Bayesian hurdle (P(plays) × E[PT|plays]) **beats Marcel PT 8/8 dev targets on the pre-registered RMSE gate** (H −25%, P −11%; bias +42..+127 PA → ±7, +6..+22 IP → ±1.1); multi-year outlook defined as expected production (p_play × conditional) with `p_play`/`pt_expected`/`p_regular` per horizon → 3 HANDOFF items for Opus (artifacts, API/UI, CLI) — wired 2026-09-18 (`handoff: M3`); lands on the next `make project`
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
 
@@ -59,8 +59,10 @@
      every player page; drop the 868 all-NaN players; silence the step-0 0/0). Then **(Daniel)**
      `make project` (~35 min) + `make diagnostics` once. That single re-run fills meta.json and
      serves as the acceptance check for that item. Also open: M2b's sidecar-filename collision.
-     Then the three M3 HANDOFF items (PT hurdle → artifacts, API/UI, CLI; same `make project`
-     re-run can serve both acceptance checks). Then M4.
+     ~~Then the three M3 HANDOFF items~~ DONE 2026-09-18 (`handoff: M3`). The same `make project`
+     re-run writes `p_play`/`pt_expected`/`p_regular` into projections.parquet, and the player page's
+     outlook picks them up. **Before shipping the outlook, read "Questions for Fable (M3 follow-up)":
+     Judge's page will say a 17% chance he plays in 2030.** Then M4.
 - ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
@@ -642,6 +644,7 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - Holdout 2025: **unspent**, authorised once now (see Next commands).
 
 ## Decisions (one line each: date — decision — why)
+- 2026-09-18 — M3 wiring (Opus): the outlook's "if he plays" PT is pt_expected / p_play from the same simulation, so the expected line = p_play × conditional exactly. Counts = posterior-mean rate × PT. Pitchers show IP only, because K counts would need a per-player BF/IP conversion the artifacts don't carry. `pt-backtest` refuses targets ≥ 2025.
 - 2026-09-17 — Fable budget re-split: cut the research-memo and hiring-manager-review missions (writing and judgement Daniel/Opus can do), moved the $30 into model research (M2 now 3 sessions, $55), playing time ($20) and a new ML-challenger mission ($10) — Fable is reserved for modelling and statistics only.
 - 2026-09-17 — Reference model verified on simulated data (0 divergences, 80% coverage 0.83) — MANUAL §5.3
 - 2026-09-17 — Opus builds all phases; Fable is reserved for M1–M5 research missions — FABLE_MISSIONS.md §1
@@ -687,6 +690,19 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.
 - 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.
 - 2026-09-17 — M2a: three upgrades behind backtest flags, all default-off, pre-registered in `docs/fable/M2_experiments.md` before any run — E2 `--env-mode recency` (recency+size-weighted league forecast + common env shock in projection draws), E3 `--rp-effect` (SP/RP covariate on P stages, T-1 role projected forward), E4 `--innov t4` (Student-t(4) talent innovations, nu fixed, projection noise matched). Full runs write to `data/artifacts/m2/` so `backtest.json` and the gates stay untouched until M2b accepts; production `project.py` wiring is a HANDOFF item gated on M2b.
+
+## Questions for Fable (M3 follow-up) — Opus 2026-09-18, found while wiring; not patched
+Measured on real data with the wired `pt_outlook_frame` (projection season 2027, seed 1):
+1. **Stars in their mid-30s after a short season.** Judge (285 PA in 2026 after 679, age 35 in 2027):
+   h1 p_play .78, pt_expected 258 (Marcel 410), p_play .52/.28/.17 at h2–h4. The hurdle has no
+   talent covariate, only PT history and a quadratic in age. Should a good hitter's rate (e.g.
+   Marcel wOBA) enter X? That is a new pre-registration, not a tweak.
+2. **Regulars sit ~11% under Marcel.** Across 44 hitters with ≥600 PA in 2025 and ≥550 in 2026,
+   median pt_expected is 0.89× Marcel and 61% land within ±15%. The HANDOFF acceptance asked for
+   ±15%. Dropping the partial-2026 outcome from training barely moves it (0.894). The partial 2026
+   *features* (season ~95% complete) remain a candidate cause; re-check after the season ends.
+   Marcel's own overall bias is +126 PA, so under Marcel for regulars may simply be right. Is
+   there a per-bucket (regulars) bias table from the dev backtest?
 
 ## Questions for Fable M1 (statistical red team) — do not change these unilaterally
 1. **Hitter HR% is where Tier 2 loses, and there are two candidate causes.** It is Tier 2's worst

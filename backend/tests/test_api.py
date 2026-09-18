@@ -35,7 +35,11 @@ def _projection_rows(pid: int, role: str, base: dict[str, float]) -> list[dict]:
                          "horizon": h, "age": 28 + h, "stat": stat,
                          "mean": m, "q10": q10, "q25": q25, "q50": q50, "q75": q75, "q90": q90,
                          "tier": "tier2",
-                         "pt": (500.0 if role == "H" else 150.0) if h == 1 else None})
+                         "pt": (500.0 if role == "H" else 150.0) if h == 1 else None,
+                         # M3 PT outlook; player 3 is outside the PT population (NaN)
+                         "p_play": None if pid == 3 else 0.9 - 0.1 * h,
+                         "pt_expected": None if pid == 3 else 450.0 - 50.0 * h,
+                         "p_regular": None if pid == 3 else 0.8 - 0.1 * h})
     return rows
 
 
@@ -204,7 +208,7 @@ def test_player_full_shape_hitter(client):
     assert r.status_code == 200
     body = r.json()
     assert set(body.keys()) == {"bio", "role", "history", "projections",
-                                 "pt", "waterfall", "aging", "league"}
+                                 "pt", "playing_time", "waterfall", "aging", "league"}
     assert body["role"] == "H"
     for col in BIO_COLS:
         assert col in body["bio"]
@@ -241,4 +245,20 @@ def test_player_with_no_projections_still_resolves(client):
     body = r.json()
     assert body["projections"] == {}
     assert body["pt"] is None
+    assert body["playing_time"] == []
     assert body["history"] == []
+
+
+def test_player_playing_time_per_horizon(client):
+    pt = client.get("/api/players/1").json()["playing_time"]
+    assert [r["horizon"] for r in pt] == HORIZONS
+    assert pt[0]["season"] == 2027 and pt[0]["age"] == 29
+    assert pt[0]["p_play"] == pytest.approx(0.8)
+    assert pt[3]["pt_expected"] == pytest.approx(250.0)
+    assert pt[3]["p_regular"] == pytest.approx(0.4)
+
+
+def test_player_playing_time_outside_population_is_null(client):
+    pt = client.get("/api/players/3").json()["playing_time"]
+    assert len(pt) == 4
+    assert all(r["p_play"] is None and r["pt_expected"] is None and r["p_regular"] is None for r in pt)

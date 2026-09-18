@@ -3,7 +3,7 @@ VENV := .venv
 RUN := cd backend && PYTHONPATH=. ../$(VENV)/bin/python
 TIER ?= 2
 
-.PHONY: setup test verify-sim data backtest-quick backtest holdout project statcast diagnostics api web
+.PHONY: setup test verify-sim data backtest-quick backtest holdout pt-backtest project statcast diagnostics api web
 
 setup:            ## Phase 0 (Daniel)
 	$(PY) -m venv $(VENV)
@@ -28,6 +28,9 @@ backtest:         ## Phase 2 full dev backtest (Daniel, long)
 
 holdout:          ## run ONCE after gates are recorded (Daniel)
 	$(RUN) -m keystone.pipeline holdout --target 2025 --tier $(TIER)
+
+pt-backtest:      ## M3 playing-time hurdle vs Marcel PT, dev targets (~3 min)
+	$(RUN) -m keystone.pipeline pt-backtest
 
 project:          ## Phase 3 production artifacts (Daniel, long)
 	$(RUN) -m keystone.pipeline project --window-end 2026 --horizons 4

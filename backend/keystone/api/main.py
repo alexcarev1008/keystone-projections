@@ -20,6 +20,7 @@ from keystone import config as C
 KEY_STATS = {"H": ["woba", "k_pct", "bb_pct", "hr_pct", "babip"],
              "P": ["fip", "k_pct", "bb_pct", "hr_pct", "babip"]}
 SORT_DEFAULT = {"H": ("woba", "desc", 300.0), "P": ("fip", "asc", 50.0)}
+PT_COLS = ("p_play", "pt_expected", "p_regular")   # M3 playing-time outlook (project.PT_COLS)
 BIO_COLS = ("mlbam_id", "name", "roles", "primary_pos", "bats", "throws",
             "birth_date", "last_team_abbr", "last_season")
 
@@ -216,6 +217,15 @@ def create_app(artifacts_dir: Path | None = None) -> FastAPI:
         if not proj_df.empty:
             pt_h1 = proj_df[proj_df.horizon == 1]["pt"].dropna()
             pt_val = _clean(pt_h1.iloc[0]) if not pt_h1.empty else None
+        # M3 playing-time outlook, one entry per horizon (absent columns -> nulls, old artifacts).
+        playing_time: list[dict] = []
+        if not proj_df.empty:
+            per_h = proj_df.drop_duplicates("horizon").sort_values("horizon")
+            playing_time = [
+                {"season": _clean(r["season"]), "horizon": _clean(r["horizon"]), "age": _clean(r["age"]),
+                 **{c: _clean(r[c]) if c in per_h.columns else None for c in PT_COLS}}
+                for _, r in per_h.iterrows()
+            ]
         projections: dict[str, list[dict]] = {}
         for stat, sub in proj_df.groupby("stat"):
             sub = sub.sort_values("horizon")
@@ -244,6 +254,7 @@ def create_app(artifacts_dir: Path | None = None) -> FastAPI:
             "history": history,
             "projections": projections,
             "pt": pt_val,
+            "playing_time": playing_time,
             "waterfall": waterfall,
             "aging": aging_by_stat,
             "league": state.league_by_role.get(role, {}),

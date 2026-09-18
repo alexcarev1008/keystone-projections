@@ -127,6 +127,14 @@ tr:hover { background: var(--bg); }
 .waterfall-bar { height: 18px; background: transparent; position: relative; border-radius: 3px; }
 .waterfall-sentence { font-size: 12px; color: var(--muted); padding: 4px 0 8px 168px; }
 
+.outlook-chip { display: inline-block; margin: 0 0 8px; padding: 3px 10px; border-radius: 999px; background: var(--bg, #f3f5f9); border: 1px solid var(--line); font-size: 12px; }
+.table-scroll { overflow-x: auto; }
+.outlook-table td { vertical-align: top; }
+.outlook-table tr.outlook-second td { border-top: none; }
+.outlook-line { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.outlook-note, .outlook-foot, .band-note { font-size: 11px; }
+.outlook-foot { white-space: normal; padding-top: 8px; }
+.band-note { margin-top: 4px; }
 .aging-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 900px) { .aging-grid { grid-template-columns: 1fr; } }
 

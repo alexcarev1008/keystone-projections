@@ -109,6 +109,7 @@ export default function Player() {
           windowEnd={windowEnd}
           height={280}
         />
+        <div className="muted band-note">Bands beyond the first projected season are model-implied, not backtested.</div>
       </div>
 
       <div className="card">
@@ -120,6 +121,7 @@ export default function Player() {
           league={data.league}
           windowEnd={windowEnd}
         />
+        <div className="muted band-note">Bands beyond the first projected season are model-implied, not backtested.</div>
       </div>
 
       <div className="card">
@@ -128,7 +130,8 @@ export default function Player() {
       </div>
 
       <div>
-        <AgingOutlook projections={data.projections} aging={data.aging} role={currentRole} />
+        <AgingOutlook projections={data.projections} aging={data.aging} role={currentRole}
+          playingTime={data.playing_time ?? []} />
       </div>
 
       <div className="card">

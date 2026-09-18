@@ -81,6 +81,38 @@ def cmd_project(args: argparse.Namespace) -> None:
              env_mode=args.env_mode)
 
 
+def cmd_pt_backtest(args: argparse.Namespace) -> None:
+    """M3: rolling-origin PT hurdle vs Marcel PT on the dev targets (docs/fable/M3_playing_time.md §3)."""
+    import pandas as pd
+
+    from keystone.eval.backtest import load_bundle
+    from keystone.models import playing_time as PT
+
+    if any(t >= C.HOLDOUT_TARGET for t in args.targets):
+        sys.exit(f"[pt-backtest] refusing targets >= {C.HOLDOUT_TARGET}: the holdout is spent "
+                 "(M3 §2 scores dev targets only)")
+    b = load_bundle()
+    ps = {r: b.ps[r] for r in args.roles}
+    res = PT.backtest_pt(ps, tuple(args.targets), seed=args.seed)
+    wide = res.pivot_table(index=["role", "target"], columns="model",
+                           values=["n", "rmse", "mae", "bias"])
+    table = pd.DataFrame({
+        "n": wide[("n", "hurdle")].astype(int),
+        "marcel_rmse": wide[("rmse", "marcel")], "hurdle_rmse": wide[("rmse", "hurdle")],
+        "marcel_mae": wide[("mae", "marcel")], "hurdle_mae": wide[("mae", "hurdle")],
+        "marcel_bias": wide[("bias", "marcel")], "hurdle_bias": wide[("bias", "hurdle")],
+    })
+    brier = res[res.model == "hurdle"].set_index(["role", "target"])[["brier", "brier_base"]]
+    table = table.join(brier)
+    print(f"[pt-backtest] targets={list(args.targets)} seed={args.seed}")
+    with pd.option_context("display.width", 140, "display.float_format", "{:.3f}".format):
+        print(table.to_string())
+    for role, g in table.groupby(level="role"):
+        wins = int((g.hurdle_rmse < g.marcel_rmse).sum())
+        print(f"[pt-backtest] {role}: hurdle beats Marcel PT RMSE on {wins}/{len(g)} targets "
+              f"(gate: >= 3 of 4)")
+
+
 def cmd_statcast(args: argparse.Namespace) -> None:
     """Populate the raw Savant cache and write processed statcast_{H,P}.parquet (MANUAL §4.1, §5.4)."""
     from keystone.data import statcast as sc
@@ -180,6 +212,12 @@ def main(argv: list[str] | None = None) -> None:
                             "league environment forecast (locked default: shock = mean3 point + "
                             "env shock in the draws; mean3 = pre-M2, no shock)")
     p.set_defaults(func=cmd_project)
+
+    pt = sub.add_parser("pt-backtest", help="M3 playing-time hurdle vs Marcel PT on the dev targets")
+    pt.add_argument("--targets", type=int, nargs="+", default=list(C.DEV_TARGETS))
+    pt.add_argument("--roles", nargs="+", default=["H", "P"], choices=("H", "P"))
+    pt.add_argument("--seed", type=int, default=1)
+    pt.set_defaults(func=cmd_pt_backtest)
 
     sc = sub.add_parser("statcast", help="fetch Savant leaderboards and write statcast_{H,P}.parquet")
     sc.add_argument("--start", type=int, default=C.SEASON_START)

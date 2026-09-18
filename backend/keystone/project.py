@@ -31,6 +31,7 @@ from keystone.components import (HITTER_STAGES, PARK_STAGES, PITCHER_STAGES,
 from keystone.data import statcast as SC
 from keystone.eval.backtest import Bundle, load_bundle, park_exposure_map
 from keystone.models import marcel as MARCEL
+from keystone.models import playing_time as PT
 from keystone.models import state_space as SS
 
 ROLES = ("H", "P")
@@ -668,6 +669,44 @@ def _venue_names(b: Bundle) -> dict:
         return {}
 
 
+# ---------------------------------------------------------------- M3 playing-time outlook
+
+PT_COLS = ["p_play", "pt_expected", "p_regular"]
+
+
+def pt_outlook_frame(b: Bundle, roles: list[str], projection_season: int, horizons: int,
+                     seed: int) -> pd.DataFrame:
+    """M3 hurdle (docs/fable/M3_playing_time.md §4): per (mlbam_id, role, horizon) p_play,
+    pt_expected (E[PA or IP] incl. the zero branch) and p_regular (P(PT >= 300 PA / 100 IP)).
+    Population = any PT in the two seasons before projection_season."""
+    parts = []
+    for role in roles:
+        ps = b.ps[role]
+        fit = PT.fit_pt(PT.training_table(ps, role, projection_season), role, seed=seed)
+        table = PT.build_pt_table(ps, role, projection_season)
+        sim = PT.simulate_horizons(fit, table, horizons=horizons, seed=seed)
+        parts.append(sim.assign(role=role))
+        h1 = sim[sim.horizon == 1]
+        print(f"[project] PT hurdle {role}: {len(table)} players, h1 mean p_play "
+              f"{h1.p_play.mean():.3f}, mean pt_expected {h1.pt_expected.mean():.1f}")
+    if not parts:
+        return pd.DataFrame(columns=["mlbam_id", "role", "horizon"] + PT_COLS)
+    out = pd.concat(parts, ignore_index=True)
+    out["mlbam_id"] = out.mlbam_id.astype("int64")
+    return out[["mlbam_id", "role", "horizon"] + PT_COLS]
+
+
+def join_pt_outlook(projections: pd.DataFrame, pt: pd.DataFrame) -> pd.DataFrame:
+    """Left-join the PT outlook onto projections by (mlbam_id, role, horizon). Players outside
+    the PT population get NaN. The Marcel `pt` column (h=1) is left untouched."""
+    if projections.empty:
+        return projections.assign(**{c: pd.Series(dtype=float) for c in PT_COLS})
+    proj = projections.drop(columns=[c for c in PT_COLS if c in projections.columns])
+    out = proj.merge(pt, on=["mlbam_id", "role", "horizon"], how="left", validate="many_to_one")
+    assert len(out) == len(proj)
+    return out
+
+
 # ---------------------------------------------------------------- schema check + spot checks
 
 SCHEMAS = {
@@ -675,7 +714,8 @@ SCHEMAS = {
                         "birth_date", "last_team_abbr", "last_season"},
     "history.parquet": {"mlbam_id", "role", "season", "team_abbr", "age", "pa", "ip"},
     "projections.parquet": {"mlbam_id", "role", "season", "horizon", "age", "stat",
-                            "mean", "q10", "q25", "q50", "q75", "q90", "tier", "pt"},
+                            "mean", "q10", "q25", "q50", "q75", "q90", "tier", "pt",
+                            "p_play", "pt_expected", "p_regular"},
     "waterfall.parquet": {"mlbam_id", "role", "stat", "step", "label", "value"},
     "aging.parquet": {"role", "stat", "age", "value"},
     "league.parquet": {"role", "season", "stat", "value"},
@@ -691,6 +731,13 @@ def assert_schema(out_dir: Path) -> None:
         missing = must_have - cols
         if missing:
             raise AssertionError(f"{name} missing columns {sorted(missing)}")
+    proj = pd.read_parquet(out_dir / "projections.parquet", columns=PT_COLS)
+    for c in ("p_play", "p_regular"):
+        v = proj[c].dropna()
+        if ((v < 0) | (v > 1)).any():
+            raise AssertionError(f"projections.parquet {c} outside [0, 1]")
+    if (proj.pt_expected.dropna() < 0).any():
+        raise AssertionError("projections.parquet pt_expected < 0")
     meta = out_dir / "meta.json"
     if not meta.exists():
         raise AssertionError(f"missing artifact: {meta}")
@@ -817,6 +864,8 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
                                marcel_pt={role: marcel_pt[role]})
         proj_rows.append(pr)
     projections = pd.concat(proj_rows, ignore_index=True) if proj_rows else pd.DataFrame()
+    projections = join_pt_outlook(
+        projections, pt_outlook_frame(b, roles, window_end + 1, horizons, seed))
 
     wf_rows = []
     for role in roles:

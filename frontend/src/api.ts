@@ -64,6 +64,16 @@ export type ProjectionRow = {
   tier: string | null
 }
 
+// M3 playing-time outlook (hurdle model), one per horizon. Null = outside the PT population.
+export type PlayingTimeRow = {
+  season: number
+  horizon: number
+  age: number | null
+  p_play: number | null
+  pt_expected: number | null
+  p_regular: number | null
+}
+
 export type WaterfallRow = {
   stat: string
   step: number
@@ -79,6 +89,7 @@ export type PlayerResponse = {
   history: HistoryRow[]
   projections: Record<string, ProjectionRow[]>
   pt: number | null
+  playing_time?: PlayingTimeRow[]
   waterfall: WaterfallRow[]
   aging: Record<string, AgingPoint[]>
   league: Record<string, number>

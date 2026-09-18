@@ -143,7 +143,7 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
   default names so `make diagnostics` keeps working.
 
-- [ ] (M3, Fable-filed 2026-09-18) Wire the playing-time hurdle into artifacts. `backend/keystone/project.py`:
+- [x] (M3, Fable-filed 2026-09-18) Wire the playing-time hurdle into artifacts. `backend/keystone/project.py`:
   in `run()`, per role, build `PT.training_table(b.ps[role], role, projection_season)` and
   `PT.fit_pt` (module `keystone.models.playing_time`; seconds per fit, seed from the CLI seed),
   then `PT.build_pt_table(b.ps[role], role, projection_season)` on the projection population and
@@ -155,7 +155,17 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   for a healthy regular (Judge 592450) h1 `p_play` > .95 and `pt_expected` within ±15% of Marcel `pt`;
   for an age-36 <150-PA player `pt_expected` < 100 at h1 and declines with h; `assert_schema` updated;
   `make test` green.
-- [ ] (M3) Surface expected production in the API + UI. `api/main.py`: include the three columns in
+  _Opus 2026-09-18: `project.pt_outlook_frame` + `join_pt_outlook` (left join, validate
+  many-to-one, `pt` untouched); `assert_schema` requires the three columns and checks
+  p_play/p_regular in [0,1], pt_expected ≥ 0. `project --quick` is green. Checked on real data
+  without `make project`: 791 H / 1017 P in the PT population. **Two acceptance misses, recorded
+  and not patched (modelling):** (1) Judge is not a healthy regular in this data (285 PA in 2026):
+  h1 p_play .78, pt_expected 258 vs Marcel 410, h4 p_play .17. (2) Across the 44 true regulars
+  (≥600 PA 2025, ≥550 2026), 89% have p_play > .95 (min .89), but median pt_expected is 0.89× Marcel
+  and only 61% land within ±15%. Excluding the partial 2026 outcome from training barely moves this
+  (0.894), so the gap is the model. Age-35+ <150-PA hitters: h1 pt_expected max 89 (n=11) and it
+  declines with h for 10 of 11. → STATUS "Questions for Fable (M3 follow-up)"._
+- [x] (M3) Surface expected production in the API + UI. `api/main.py`: include the three columns in
   the player payload per horizon. Frontend `AgingOutlook` (or the multi-year section): show two
   lines per horizon — "if he plays" (existing conditional stats) and "expected" (counting stats
   scaled by `pt_expected`; rate stats unchanged, labelled with `p_play`), plus a
@@ -164,6 +174,19 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   intervals are model-implied, not backtested; (c) PT hurdle beat Marcel PT on RMSE 8/8 dev
   targets (H −25%, P −11%, bias +126→+3 PA, +22→+1 IP), table in docs/fable/M3_playing_time.md —
   ✔ a fringe veteran's page shows expected ≪ conditional counting stats; `npm run build` passes.
-- [ ] (M3) CLI + backtest hook (small): add `keystone.pipeline` subcommand `pt-backtest` running
+  _Opus 2026-09-18: `/api/players/{id}` gains `playing_time: [{season, horizon, age, p_play,
+  pt_expected, p_regular}]`, with nulls when the columns are missing or the player is outside the
+  population. Outlook card: per horizon, an "If he plays" line (PT = pt_expected / p_play, HR/BB/K =
+  posterior-mean rate × PT, rates with bands) and an "Expected" line (pt_expected, the same counts,
+  "rates as above · N% chance he plays"). A chip shows p_regular at h4. Pitchers show IP only,
+  because there is no per-player BF/IP conversion for K counts. h2–h4 ranges carry † and a footnote
+  "model-implied, not backtested", with the same note under the fan chart and the components
+  panel. Methodology gains a playing-time section with (a)–(c), and the Limitations bullets are
+  updated. Fringe-veteran check, run through the real API on a scratch copy of production
+  artifacts: McCutchen h1 is 42 expected PA vs 182 if he plays (HR 1.2 vs 5.2)._
+- [x] (M3) CLI + backtest hook (small): add `keystone.pipeline` subcommand `pt-backtest` running
   `PT.backtest_pt(b.ps, C.DEV_TARGETS)` and printing the table (no JSON artifact needed) — ✔ command
   runs end-to-end in ≲3 min and matches docs/fable/M3_playing_time.md §3 numbers at seed 1.
+  _Opus 2026-09-18: `make pt-backtest` (flags `--targets/--roles/--seed`) ran in 94 s and matches
+  §3 to the printed digit on all 8 rows (RMSE, bias, Brier). It refuses targets ≥ 2025, because the
+  holdout is spent; a test covers the refusal._
