@@ -226,3 +226,88 @@ PYTHONPATH=. ../.venv/bin/python -m keystone.pipeline backtest --obs-noise --env
 E5 is judged vs base; E6's marginal effect is E5E6 vs E5. If E3 passes its (M2a) rule it is a
 candidate for the M2c lock-in bundle alongside whatever survives here — combinations are
 M2c's job, judged once, with the holdout still unspent.
+
+---
+
+## M2c decisions + lock-in (2026-09-18, from `backtest_E3.json` / `backtest_E5.json` / `backtest_E5E6.json`)
+
+Headline (PA-weighted RMSE, mean 2021–2024): H wOBA marcel .0334 / base .0333 / E5 .0328 /
+E5+E6 .0328; P FIP marcel .7947 / base .8223 / E3 .8204 / E5 .8162 / E5+E6 .8164.
+
+- **E5 — ACCEPT.** Every pre-registered sub-check passed, none marginally:
+  1. tau fell > 20% with sigma_obs clearly nonzero (mean over targets): H/k .1232→.0972 (−21%,
+     sigma_obs .078), H/bb .1293→.0607 (−53%, .132), P/k .1457→.0994 (−32%, .113),
+     P/bb .1204→.0897 (−26%, .098); every sigma_obs ≥ 7 sd from 0 — not relabelling this time:
+  2. the chasing correlation moved to Marcel's side of zero on all four stages (computed
+     identically on the base and E5E6 sidecars; E6 is fits-identical to E5): H/k +.042→−.038,
+     H/bb +.048→−.070, P/k +.116→−.031, P/bb +.052→+.008.
+  3. bb_pct RMSE improved in H 3/4 (2024 −.00002, the one miss) and P 4/4 — required ≥ 2/4 both.
+  4. P FIP mean .8223→.8162 ✓; H wOBA .0333→.0328 ✓; H wOBA cov80 .806 in [.75,.85] ✓.
+  5. No reject trigger: divergences 121 vs baseline 313 (H/hit_bip 181→25 — obs-noise
+     largely dissolved the M1-F5 funnel as a side effect); sigma_obs nowhere near 0.
+- **E6 — ACCEPT.** Judged as registered on E5E6 vs E5: fits byte-identical (tau equal to full
+  precision across all 48 fits); all RMSE within noise (FIP .8162 vs .8164, wOBA .03276 vs
+  .03278); P FIP cov80 .734→.761, +.027 ≈ the E2 delta, per-target .781/.702/.769/.792; both
+  roles in band (H .820, P .761), no overshoot. **The shipping candidate is E5+E6.**
+- **E3 — REJECT for the lock-in bundle.** Against its M2a rule: delta_role clearly nonzero with
+  the registered signs in all 4 targets (k +.14..+.17, ~10 sd; hr −.09..−.14, ~5–7 sd) ✓;
+  overall FIP improved 3/4 (2021/2023/2024; 2022 worsened .8902→.8941) ✓ vs required ≥ 2/4;
+  but the **RP-subgroup ≥ 3/4 sub-check — the mechanism the experiment exists to test — is
+  unverifiable**: the E5 run overwrote E3's predictions sidecar (same single-slot collision that
+  cost E2 a sub-check; HANDOFF item still open). An unverifiable pass is not a pass. Weighing
+  the rest: the marginal gain is small (.8223→.8204) and mostly subsumed by E5 (P k .0395 vs
+  E5 .0388, P bb .0218 vs .0217); 2022 P/hr hit r_hat 1.363, the worst fit in the project, in
+  exactly the year E3 got worse; and E3 was run against the old baseline, so bundling it would
+  require one more ~50-min combined dev run to judge — for a variant carrying a convergence
+  failure. Not worth the run. The idea stays plausible (the delta_role posteriors are real);
+  re-testable post-M2 on top of the locked config if anyone wants it.
+- **`--innov t4` for geometry — DECLINED**, per a quick check pre-registered before the run
+  (`--quick --obs-noise --innov t4`, H 2024 k+hr, seed 1, vs E5-quick): divergences 0/1 ✓, but
+  stage_k .0340 / stage_hr .0169 — identical to E5-quick, not strikingly better; tau H/k
+  .0666 ≈ .0964/√2 — **the E4 relabelling reappears under obs-noise** (walk-share variance
+  conserved, scale renamed); and max r_hat 1.371 on H/k at quick scale is a red flag, not the
+  cleaner geometry that was t4's only remaining case. Its M2b geometry gain (313→172) was
+  measured without obs-noise; E5 gets further (121) with the funnel fixed (H/hit_bip r_hat
+  1.23→1.07). Adopting t4 would also make the locked config one no full dev run has validated.
+- **Correlated stages — ASSESSED, NOT ATTEMPTED.** The observed cross-stage residual
+  correlations (stage_correlations.csv, the honest data-only proxy) top out at P bb–k .32,
+  H hr–xbh .31, H k–xbh .24, most pairs |r| < .15. A joint walk/shared factor pools information
+  across stages — but the binding losses after E5 are regime/environment errors (P 2022
+  .8905 vs marcel .8214 dead-ball; H 2023 .0322 vs .0304 shift ban), which cross-stage pooling
+  does not touch, and the per-stage architecture would have to be rebuilt into one joint model
+  (7 H + 5 P latent walks), resetting every validated result at ~10× sampling cost. Expected
+  gain small, cost the largest in the project, holdout waiting. Declined with reasons, not
+  deferred: post-holdout work if the project continues.
+
+### The mean and the gate disagree on hitters — which measures projection skill?
+
+E5 hitters beat Marcel on the 4-year PA-weighted mean (.0328 vs .0334) but win only 2/4 years,
+losing 2021 by .0002 and 2023 by .0018, so the gate (≥ 3/4) fails. **The mean is the better
+measure of skill.** Per-year win counting is a sign test with n = 4: it throws away magnitude
+(a .0002 loss counts the same as a .0023 loss), and its sampling noise at n = 4 exceeds that of
+the mean it is guarding. The count's one virtue — robustness to a single lucky year — matters,
+but E5's mean win is not one lucky year: it improves the mean in 4/4 years for H wOBA
+(.0341→.0338, .0338→.0326, .0327→.0322, .0329→.0326 vs base). Judged by expected loss, the
+locked hitter model is now better than Marcel. **The gate stays as written for this decision**
+(it was pre-registered; moving it after seeing the numbers is exactly what pre-registration
+exists to prevent): production points remain Marcel for both roles. Recommendation for the
+README/memo, not for this decision: a future gate should test the mean RMSE difference with a
+paired-by-player block bootstrap rather than count years.
+
+### Locked production configuration
+
+**Tier 2 with `--obs-noise --env-mode shock` (E5+E6), innov normal, no rp-effect, park-aware
+scoring — exactly the configuration of the full dev run in `backtest_E5E6.json`, seed 1.**
+Gates on that run: H FAIL 2/4 (cov80 .820 ✓), P FAIL 1/4 (cov80 .761 ✓) → per MANUAL §6,
+production ships **Marcel points with Tier 2 bands**, where the bands, aging drift and
+waterfall now come from the locked config. Coverage is in band for both roles for the first
+time in the project.
+
+Holdout (Daniel, ONCE, after Opus wires the HANDOFF items so the holdout subcommand carries
+the locked flags and `backtest.json` is the promoted E5E6 run):
+
+```
+make holdout
+```
+
+Record the 2025 result in this file and STATUS.md exactly as printed, good or bad.

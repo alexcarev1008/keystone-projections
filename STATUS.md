@@ -14,7 +14,7 @@
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
-- [ ] M2c Correlated stages / sampler geometry, lock config + `make holdout` ($15) → Opus wires → `make project diagnostics`
+- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wires 4 HANDOFF items → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -28,9 +28,23 @@
 | M1 | $15 | ~$5 (Fable self-estimate) | ~$5 |
 | M2a | $20 | Daniel fills in (Fable self-estimate ~$8: input ~250k, output ~20k) | ~$13 |
 | M2b | $20 | Daniel fills in (Fable self-estimate ~$7: input ~220k, output ~18k) | ~$20 |
+| M2c | $15 | Daniel fills in (Fable self-estimate ~$6: input ~200k, output ~12k) | ~$26 |
 
 ## Next command(s) for Daniel
-- **After Fable M2b (2026-09-18): run the three M2b backtests** (~50 + ~25 + ~50 min). E3's
+- **After Fable M2c (2026-09-18): the holdout, in this order.**
+  1. Opus wires the four unchecked M2c items in `docs/fable/HANDOFF.md`. The first three MUST
+     land before the holdout: today `make holdout` would score 2025 with the OLD config (the
+     holdout subcommand passes no experiment flags), and `backtest.json` must first become the
+     promoted E5E6 run (a file copy, no re-run — HANDOFF item 3).
+  2. `make holdout` — ONCE. (~15 min: one target year, both roles, locked config
+     `--obs-noise --env-mode shock`.)
+  3. Paste the printed 2025 table + gates back into the M2c Fable session ("Results of
+     `make holdout`: …") so the result is recorded in M2_experiments.md and here, honestly,
+     whatever it says. The dev-side expectation, written before the run: H wOBA close to or
+     better than Marcel, P FIP worse than Marcel, cov80 in [.75,.85] for both.
+  4. `make project` (~35 min) then `make diagnostics` (~10 s) — production artifacts + context
+     pack under the locked config.
+- ~~After Fable M2b (2026-09-18): run the three M2b backtests~~ DONE 2026-09-18 (results below) (~50 + ~25 + ~50 min). E3's
   original run never completed (`backtest_E3.json` was not on disk), so it goes back on the
   queue unchanged. Note: consecutive runs overwrite each other's sidecar parquets in
   `data/artifacts/m2/` (HANDOFF item filed) — if Opus hasn't fixed that yet, either run them
@@ -84,9 +98,33 @@
 - P6.5 done (agent-only, no long compute); the context pack is at `docs/fable_context/`.
   Ready to launch **Fable M1** with the kickoff prompt in `FABLE_MISSIONS.md` §5.
 - Backlog long jobs: none.
-- **Still do NOT run `make holdout`.** Stage B M2b spends it after Fable iterates the model.
+- **`make holdout` is now authorised — ONCE, after the first three M2c HANDOFF items land** (see the ordered list at the top of this section). Running it before the wiring scores 2025 with the wrong config and burns the one-shot.
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### M2c judge + lock — Fable (2026-09-18)
+Full verdicts: `docs/fable/M2_experiments.md` §"M2c decisions". Judged the three full runs:
+- **E5 ACCEPT** — every pre-registered sub-check passed: tau −21..−53% with sigma_obs ≥ 7 sd
+  from 0 (not relabelling); chasing corr crossed to Marcel's side on all 4 stages (P/k
+  +.116→−.031); bb_pct H 3/4, P 4/4; FIP mean .8223→.8162; wOBA .0333→.0328; divergences
+  313→121 with the M1-F5 H/hit_bip funnel largely dissolved (181→25, r_hat 1.23→1.07).
+- **E6 ACCEPT** — fits byte-identical to E5, RMSE within noise, P FIP cov80 .734→.761 (≈ the
+  E2 delta, as registered), both roles in band. Shipping candidate = **E5+E6**.
+- **E3 REJECT** for the bundle — delta_role real (~10 sd, right signs) and overall FIP 3/4 ✓,
+  but the RP-subgroup sub-check (the mechanism test) is unverifiable (sidecar overwritten,
+  same collision that cost E2), r_hat 1.363 on 2022 P/hr is the worst fit in the project, and
+  the gain (.8204) is mostly subsumed by E5 (.8162). Bundling would cost another full run.
+- **t4 DECLINED** on a pre-registered quick: under obs-noise the E4 relabelling reappears
+  (tau .0964→.0666 ≈ /√2), RMSE identical, r_hat 1.371 red flag. Correlated stages assessed
+  and declined: observed cross-stage corr ≤ .32, binding losses are environment-regime errors
+  pooling can't touch, cost = full joint-model rebuild.
+- **Locked config: tier2 `--obs-noise --env-mode shock`** = `backtest_E5E6.json` exactly.
+  Gates: H FAIL 2/4 (cov80 .820 ✓), P FAIL 1/4 (.761 ✓) → production stays Marcel points +
+  Tier 2 bands; coverage in band for both roles for the first time. On the H mean-vs-gate
+  split (.0328 beats .0334 but 2/4 years): the mean is the better skill measure (n=4 sign test
+  discards magnitude; E5 improved all 4 years vs base) — argued in the doc, gate left as
+  written, no goalpost move. 4 HANDOFF items for Opus; holdout order + command above.
+  Fable self-estimate ~$6.
 
 ### M2b judge + iterate — Fable (2026-09-18)
 Full verdicts + new pre-registrations: `docs/fable/M2_experiments.md` §"M2b decisions".
@@ -495,6 +533,8 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - 2026-09-17 — P6.5: stage_correlations.csv uses observed residual (rate − season league rate) as the talent proxy; the "correlated stages" question is really about the model posterior, which needs the sidecar. This proxy is the honest read from data alone.
 
 - 2026-09-17 — M1: backtest scores Tier 2/3 park stages in the player's T-1 park (park-aware) by default — park-neutral scoring handicapped only Tier 2 vs a park-inheriting Marcel; `--park-neutral` preserves the old behaviour; gates re-decided by Daniel's re-run, not edited by hand.
+- 2026-09-18 — M2c: production configuration locked = tier2 `--obs-noise --env-mode shock` (the `backtest_E5E6.json` run, seed 1) — E5 and E6 passed every pre-registered sub-check; E3 rejected (core sub-check unverifiable + r_hat 1.363 + gain subsumed by E5); `--innov t4` declined (relabelling reappears under obs-noise, no geometry win); correlated stages declined with reasons (weak observed corr, binding losses are regime errors, rebuild cost). Gates still FAIL → Marcel points + Tier 2 bands; holdout runs the locked config after Opus wires the flags.
+- 2026-09-18 — M2c: on hitters the 4-year mean RMSE (.0328 vs Marcel .0334, better in all 4 years vs base) and the per-year gate (2/4) disagree; recorded the argument that the mean measures skill better, but left the pre-registered gate unmoved for this decision.
 - 2026-09-18 — M2b: E2 and E4 rejected against their pre-registered rules (no goalpost moves); E4's variance-conservation finding redirects M1-F4 to a transient obs-noise term (E5) and E2's validated shock half survives as E6; E4's geometry gain deferred to M2c rather than shipped mid-stream, so E5/E6 are judged against a stable baseline.
 - 2026-09-17 — M2a: three upgrades behind backtest flags, all default-off, pre-registered in `docs/fable/M2_experiments.md` before any run — E2 `--env-mode recency` (recency+size-weighted league forecast + common env shock in projection draws), E3 `--rp-effect` (SP/RP covariate on P stages, T-1 role projected forward), E4 `--innov t4` (Student-t(4) talent innovations, nu fixed, projection noise matched). Full runs write to `data/artifacts/m2/` so `backtest.json` and the gates stay untouched until M2b accepts; production `project.py` wiring is a HANDOFF item gated on M2b.
 
