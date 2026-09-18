@@ -727,6 +727,18 @@ def _write_sidecar(path: Path, new_rows: list[dict], schema_cols: list[str]) -> 
     print(f"[backtest] wrote {path.name} ({len(combined)} rows)")
 
 
+def sidecar_paths(out: Path, quick: bool) -> tuple[Path, Path]:
+    """Default out names keep the canonical sidecar names (`make diagnostics` reads them);
+    a custom --out derives its own, so experiment runs can't overwrite each other's sidecars
+    (the M2b collision that cost E2 and E3 a pre-registered sub-check each)."""
+    suffix = "_quick" if quick else ""
+    if out.stem == f"backtest{suffix}":
+        return (out.parent / f"backtest_predictions{suffix}.parquet",
+                out.parent / f"backtest_posteriors{suffix}.parquet")
+    return (out.parent / f"{out.stem}_predictions.parquet",
+            out.parent / f"{out.stem}_posteriors.parquet")
+
+
 PRED_SCHEMA = ["target", "role", "tier", "mlbam_id", "stat",
                "pred_mean", "q10", "q50", "q90"]
 POST_SCHEMA = ["target", "role", "tier", "stage",
@@ -800,7 +812,7 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     payload = write_json(out, rows, all_targets, gates, production, holdout_target, park_aware,
                          experiment_flags=flags)
 
-    suffix = "_quick" if quick else ""
-    _write_sidecar(out.parent / f"backtest_predictions{suffix}.parquet", new_preds, PRED_SCHEMA)
-    _write_sidecar(out.parent / f"backtest_posteriors{suffix}.parquet", new_posts, POST_SCHEMA)
+    pred_path, post_path = sidecar_paths(out, quick)
+    _write_sidecar(pred_path, new_preds, PRED_SCHEMA)
+    _write_sidecar(post_path, new_posts, POST_SCHEMA)
     return payload

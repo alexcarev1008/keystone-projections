@@ -70,10 +70,14 @@
   4. ~~`make project` + `make diagnostics`~~ DONE 16:19. The run started before the HANDOFF item 4
      commit, though, so meta.json has no `model_config` / `sigma_obs_mean` / `sigma_env`. The
      projections are the locked config. Artifact checks A and B (Results) ran on these files.
-  5. **← NEXT (Opus):** the new "artifact check B" HANDOFF item (Waterfall null steps render as 0 on
-     every player page; drop the 868 all-NaN players; silence the step-0 0/0). Then **(Daniel)**
-     `make project` (~35 min) + `make diagnostics` once. That single re-run fills meta.json and
-     serves as the acceptance check for that item. Also open: M2b's sidecar-filename collision.
+  5. ~~the new "artifact check B" HANDOFF item~~ DONE 2026-09-18 (Fable, at Daniel's direction):
+     Waterfall.tsx skips null steps and hides unshipped steps 3/4; project.py drops the 868
+     all-NaN ids (verified orphans — absent from players.parquet, unreachable in the UI),
+     silences the step-0 0/0, and the schema check now fails on non-finite quantiles.
+     ~~M2b sidecar-filename collision~~ DONE 2026-09-18 (`sidecar_paths`, unit-tested).
+     **← NEXT (Daniel):** `make project` (~35 min) + `make diagnostics` once. That single re-run
+     fills meta.json (`model_config`/`sigma_obs_mean`/`sigma_env`), ships the M3 outlook columns,
+     drops the orphan rows, and is the on-disk acceptance for artifact check B (c).
      ~~Then the three M3 HANDOFF items~~ DONE 2026-09-18 (`handoff: M3`). The same `make project`
      re-run writes `p_play`/`pt_expected`/`p_regular` into projections.parquet, and the player page's
      outlook picks them up. ~~Before shipping the outlook, read "Questions for Fable (M3 follow-up)"~~
@@ -140,6 +144,19 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### Queue close-out — Fable (2026-09-18, at Daniel's direction)
+- Outlook chip restores the threshold: "Chance still an MLB regular in 2027 (≥ 300 PA)" for H,
+  "(≥ 100 IP)" for P — matches `REGULAR_PT` in playing_time.py.
+- HANDOFF queue is now EMPTY. Closed: artifact check B parts (b)+(c) (errstate wrap; marcel-anchor
+  NaN drop; schema check fails on non-finite quantiles — the 868 all-NaN ids verified as orphans
+  absent from players.parquet, so parquet hygiene, not user-facing) and the M2b sidecar collision
+  (`sidecar_paths`, unit-tested; the two-MCMC-run acceptance deliberately deferred to the next
+  natural quick pair — naming logic is the whole fix). M4 leakage test was already ticked (Opus).
+- `make test` 65 pass · `npm run build` passes. docs/screenshots/ holds five files but they are
+  dated **2026-09-17, not today** — flagging, not fixing (screenshots are Daniel's). README.md
+  links docs/research_memo.md (exists, 18 KB) and embeds all five screenshots.
+- Remaining before Stage C closes: Daniel's one `make project` + `make diagnostics`.
 
 ### Outlook playing time h1-only — Opus (2026-09-18, frontend + docs, no compute)
 - Decision: the hurdle PT model is backtested at h1 only (`make pt-backtest`); at h2+ it feeds its

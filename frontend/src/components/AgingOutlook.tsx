@@ -50,7 +50,9 @@ export default function AgingOutlook({
         <h3>Outlook (h = 1…4)</h3>
         {hasPT && h1 && isNum(h1.p_regular) && (
           <div className="outlook-chip">
-            Chance still an MLB regular in {h1.season} — <strong>{pctInt(h1.p_regular)}</strong>
+            Chance still an MLB regular in {h1.season}{' '}
+            <span className="muted">(≥ {role === 'H' ? '300 PA' : '100 IP'})</span> —{' '}
+            <strong>{pctInt(h1.p_regular)}</strong>
           </div>
         )}
         <div className="table-scroll">

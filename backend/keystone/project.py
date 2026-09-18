@@ -322,6 +322,17 @@ def projections_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dic
             continue
         m_rates = marcel[role].reindex(ids)
         m_pt = marcel_pt[role].reindex(ids).to_numpy(dtype=float)
+        partial = set(stages) != set(ROLE_STAGES[role])
+        if prod_tier.get(role) == "marcel" and not partial:
+            # Anchoring to an all-NaN Marcel line yields all-NaN rows; those ids have no
+            # recent season, are absent from players.parquet, and are unreachable in the UI.
+            ok = np.isfinite(m_rates.to_numpy(dtype=float)).all(axis=1)
+            if (~ok).any():
+                print(f"  [projections] {role}: dropped {int((~ok).sum())} ids with no "
+                      f"Marcel line (would be all-NaN under marcel-anchor)")
+                ids = ids[ok]
+                m_rates = m_rates.loc[ids]
+                m_pt = m_pt[ok]
         age_next = role_fits[stages[0]].age_next[
             pd.Series(np.arange(len(role_fits[stages[0]].ids)),
                       index=role_fits[stages[0]].ids).loc[ids].to_numpy()
@@ -329,7 +340,6 @@ def projections_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dic
 
         # Slice + optionally anchor each stage's per-horizon draws.
         stage_draws = {}
-        partial = set(stages) != set(ROLE_STAGES[role])
         for stage in stages:
             P_neutral, P_park = _reindex_fit(role_fits[stage], ids)
             P_ship = _ship_draws(P_neutral, P_park, stage)
@@ -415,13 +425,16 @@ def waterfall_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dict,
         raw_stages = {}
         if not raw.dropna(how="all").empty:
             raw_rates = {e: raw[e].fillna(0).to_numpy() for e in raw.columns}
-            raw_stages = MARCEL.to_stage_probs(raw_rates)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                raw_stages = MARCEL.to_stage_probs(raw_rates)
         else:
             for s in stages:
                 raw_stages[s] = np.full(len(ids), np.nan)
-        # Derived stat for step 0 (single value per player, not a draw distribution)
+        # Derived stat for step 0 (single value per player, not a draw distribution).
+        # errstate: a debut player's 0/0 (e.g. xbh / h_bip) is an honest NaN, not warning spam.
         try:
-            step0_stats = derived_stats(raw_stages, role, env, pa=None, ip=None)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                step0_stats = derived_stats(raw_stages, role, env, pa=None, ip=None)
             step0 = step0_stats[KEY_STAT[role]]
         except Exception:
             step0 = np.full(len(ids), np.nan)
@@ -739,6 +752,11 @@ def assert_schema(out_dir: Path) -> None:
             raise AssertionError(f"projections.parquet {c} outside [0, 1]")
     if (proj.pt_expected.dropna() < 0).any():
         raise AssertionError("projections.parquet pt_expected < 0")
+    qcols = ["mean", "q10", "q25", "q50", "q75", "q90"]
+    qv = pd.read_parquet(out_dir / "projections.parquet", columns=qcols).to_numpy(dtype=float)
+    n_bad = int((~np.isfinite(qv)).any(axis=1).sum())
+    if n_bad:
+        raise AssertionError(f"projections.parquet has {n_bad} rows with non-finite {qcols}")
     meta = out_dir / "meta.json"
     if not meta.exists():
         raise AssertionError(f"missing artifact: {meta}")

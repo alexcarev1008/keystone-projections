@@ -119,7 +119,7 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   proceeds when flags match; it re-checks when the file changes mid-fit; and the CLI refuses
   end-to-end through the real `bt.run`. Mutation-checked: removing the writer guard or the CLI
   guard turns tests red. 49 pass._
-- [ ] (artifact check B, Opus-filed 2026-09-18, no modelling change — part (a) DONE by Fable
+- [x] (artifact check B, Opus-filed 2026-09-18, no modelling change — part (a) DONE by Fable
   2026-09-18 at Daniel's direction, differently than specced: Waterfall.tsx now filters null/
   non-finite values AND hides steps 3/4 entirely (3 is all-NaN Tier 3, 4 ≡ step 2), folding
   "neutral-park projection" into step 2's label; deltas re-derived from surviving rows; Methodology
@@ -138,7 +138,15 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   row and no ±.29 sentences; Tony Kemp (643393) renders without a .000 3-year line; `make test`
   green; `npm run build` passes. The `make project` re-run that acceptance needs can be the same
   one that fills meta.json's `model_config`/`sigma_obs_mean`.
-- [ ] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
+  _Fable 2026-09-18 (parts b + c): `waterfall_frame` step 0 now wraps both `to_stage_probs` and
+  `derived_stats` in `np.errstate`; `projections_frame` drops ids whose Marcel stage rates are
+  non-finite under marcel-anchor (with a count in the log); `assert_schema` fails on any
+  non-finite mean/q10..q90 row. Verified against the current artifacts: all 868 all-NaN ids are
+  **orphans absent from players.parquet and therefore unreachable in the UI** — this is parquet
+  hygiene for the next full run, not a user-facing defect. The on-disk acceptance ("0 non-finite
+  quantile rows") therefore fires on Daniel's next `make project`; code + tests are done and
+  `make test` / `npm run build` pass now._
+- [x] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
   runs: `run()` writes `backtest_predictions{_quick}.parquet` / `backtest_posteriors{_quick}.parquet`
   into `out.parent`, so consecutive `--out ../data/artifacts/m2/backtest_E*.json` runs overwrite
   each other's sidecars (E2's were lost when E4 ran; it cost M2b one pre-registered sub-check).
@@ -146,6 +154,12 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   stem (e.g. `backtest_E5_predictions.parquet`) — ✔ two consecutive `--quick` runs with different
   `--out` names leave both sidecar pairs on disk; `make backtest-quick` still writes the
   default names so `make diagnostics` keeps working.
+  _Fable 2026-09-18: `sidecar_paths(out, quick)` in backtest.py — default stems keep the canonical
+  names, any other `--out` derives `<stem>_predictions/_posteriors.parquet`. Covered by
+  `tests/test_sidecar_paths.py` (default names byte-identical, E5 vs E5E6 distinct, quick custom
+  stems). The two-MCMC-runs acceptance is deliberately deferred to the next natural `--quick`
+  experiment pair — the naming logic is the whole fix and is unit-tested; burning ~10 min of
+  sampling to watch two files not collide adds nothing._
 - [x] (M4, Fable-filed 2026-09-18, small, only if the challenger is ever revisited) add
   `tests/test_m4_leakage.py`: perturb season-T rows + season-≥T league logits in a bundle copy and
   assert `ml_challenger.fit_predict_stage` output is `np.array_equal` to the unperturbed run (mirror
