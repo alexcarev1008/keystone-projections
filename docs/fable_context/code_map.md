@@ -1,6 +1,6 @@
 # code_map — one line per backend file
 
-generated: 2026-09-18T20:19:56+00:00
+generated: 2026-09-18T22:20:29+00:00
 
 - `keystone/__init__.py` — (no docstring)
 - `keystone/api/__init__.py` — (no docstring)
@@ -14,9 +14,12 @@ generated: 2026-09-18T20:19:56+00:00
 - `keystone/diagnostics.py` — Phase 6.5 — Fable context pack (FABLE_MISSIONS.md §3).  (key: build_backtest_summary(), build_posterior_summaries(), build_aging_curves(), build_park_effects(), MarcelRun, build_residuals_by_bucket())
 - `keystone/eval/__init__.py` — (no docstring)
 - `keystone/eval/backtest.py` — Rolling-origin backtest: Tier 1 (Marcel) vs Tier 2/3 (state-space). MANUAL.md §6.  (key: Bundle, load_bundle(), rd(), train_slice(), cut(), scoring_env())
+- `keystone/eval/m4_verdict.py` — Aggregate m4_results.json into the pre-registered A1/A2/A3 verdicts + tables.  (key: main())
+- `keystone/eval/ml_challenger.py` — M4 ML challenger: HistGradientBoostingRegressor vs the locked Tier 2 (E5+E6).  (key: stage_table(), feature_frame(), training_data(), fit_predict_stage(), gbm_probs(), s_binom())
 - `keystone/league.py` — League-season constants. VERIFIED REFERENCE (tests: backend/tests/test_league.py).  (key: stage_league_rates(), hitter_constants(), pitcher_constants(), projection_logit(), projection_logit_recency())
 - `keystone/models/__init__.py` — (no docstring)
 - `keystone/models/marcel.py` — Tier 1 baseline: Marcel (Tom Tango), applied to per-PA' events.  (key: events_table(), to_stage_probs(), marcel(), marcel_playing_time())
+- `keystone/models/playing_time.py` — M3 playing-time hurdle model (docs/fable/M3_playing_time.md).  (key: talent_table(), pt_series(), build_pt_table(), training_table(), PTFit, fit_pt())
 - `keystone/models/state_space.py` — Tier 2/3 model: Bayesian state-space ("random-walk talent") model for ONE binomial stage.  (key: StageData, build_stage_data(), build_model(), fit(), project())
-- `keystone/pipeline.py` — KEYSTONE CLI. Subcommands: fetch, build (P1) · backtest, holdout (P2) · project (P3) · statcast (P6).  (key: cmd_fetch(), cmd_build(), cmd_backtest(), cmd_project(), cmd_statcast(), cmd_diagnostics())
+- `keystone/pipeline.py` — KEYSTONE CLI. Subcommands: fetch, build (P1) · backtest, holdout (P2) · project (P3) · statcast (P6).  (key: cmd_fetch(), cmd_build(), cmd_backtest(), cmd_project(), cmd_pt_backtest(), cmd_statcast())
 - `keystone/project.py` — Production artifacts (MANUAL.md §7): writes the parquet + meta.json set the API serves.  (key: latest_env(), row(), derived_stats(), StageFit, fit_and_project_stage(), projections_frame())
