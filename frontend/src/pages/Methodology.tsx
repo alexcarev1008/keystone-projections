@@ -318,13 +318,14 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         has checked their calibration.
       </p>
       <p>
-        <strong>Known artifact: optimism for old stars beyond year 1.</strong> Because teams give
-        good players playing time, a star coming off a short season projects high again at year 1
-        (e.g. Aaron Judge after 285 PA in 2026: 96% chance he plays, about 545 expected PA). At
-        h2–h4, expected playing time can <em>rise</em> with horizon: simulated healthy seasons
-        replace the depressed observed season while talent is held fixed and aging is only a mild
-        quadratic. Treat h2–h4 playing time for older stars as optimistic; it is model-implied,
-        not backtested.
+        <strong>Playing time is shown for year 1 only.</strong> Because teams give good players
+        playing time, a star coming off a short season projects high again at year 1 (e.g. Aaron
+        Judge after 285 PA in 2026: 96% chance he plays, about 545 expected PA). The hurdle model is
+        backtested at h1 only (<code>make pt-backtest</code>). At h2+ it feeds its own simulated
+        healthy seasons back in as the recent-PT feature, so expected playing time rises with age
+        for players whose recent PT was injury-depressed: Judge goes 545 / 579 / 620 / 646 PA from
+        age 35 to 38 while his wOBA correctly declines from .419 to .369. We do not display a number
+        we have not validated, so the outlook shows rates only for years 2–4.
       </p>
       <p>
         <strong>Validation (M3).</strong> On the same population and actuals, the hurdle beat
@@ -390,6 +391,7 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
 
       <h2>Limitations</h2>
       <ul>
+        <li>The outlook shows playing time for year 1 only, by design: at h2+ the hurdle model feeds its own simulated healthy seasons back in as recent PT, so injury-depressed stars' PT rises with age, and only h1 is backtested.</li>
         <li>Headline playing time is Marcel's. Attrition enters only through the multi-year outlook's hurdle model, which has no role-change or injury-report information.</li>
         <li>Stages are fit independently; between-stage correlation is ignored when combining.</li>
         <li>Projections are park-neutral. Rate projections are conditional on the player playing; the outlook's "expected" line is not.</li>

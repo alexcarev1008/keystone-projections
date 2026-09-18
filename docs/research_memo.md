@@ -210,12 +210,14 @@ and learned from ≤ 960 rows.
    wOBA bands often *don't widen* from h1 to h4 (17.6% of hitters). That isn't a bug. Logit-space
    sd widens for 96–100% of players on every stage checked, and aging pulls HR/XBH rates down, which
    shrinks rate-space width faster than drift grows it [`STATUS.md`, artifact check A].
-2. **Old stars' `pt_expected` rises with horizon.** Judge goes 545 → 646 from h1 to h4, because
-   the simulation replaces a depressed observed season with simulated healthy ones while talent is
-   held fixed and aging enters only through a mild quadratic [`M3_playing_time.md` §7]. The h1
-   number is dev-validated. For old stars, h2–h4 now leans optimistic. This was left unpatched on
-   purpose; it's flagged on the Methodology page and should be re-examined when a new season of
-   data arrives.
+2. **Playing time is displayed for h1 only — a deliberate display decision.** The hurdle model is
+   backtested at h1 only (`make pt-backtest`). At h2+ the simulation feeds its own simulated healthy
+   seasons back in as the recent-PT feature, so expected PT rises with age for players whose recent
+   PT was injury-depressed: Judge goes 545 / 579 / 620 / 646 PA from age 35 to 38 while his wOBA
+   correctly declines .419 → .369 [`M3_playing_time.md` §7]. The model is unpatched; instead the
+   player page shows h2–h4 as rates only ("rates only — playing time projected one year ahead"),
+   because we do not display a number we have not validated. An h2+ PT backtest, or a fix to the
+   feedback, is the precondition for showing it again.
 3. **The production fit isn't fully converged.** Max r_hat is 1.16 (H/k) with 89 divergences
    across 12 fits, 69 of them in P/bb; P/hbp and H/triple are also above 1.1 [`CONTEXT.md` §5–6].
    The 2025 holdout fits reached r_hat 1.27 (P/hr) with 63 divergences [`M2_experiments.md`]. E5

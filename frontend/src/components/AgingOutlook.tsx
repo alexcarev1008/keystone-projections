@@ -14,7 +14,11 @@ const COUNT_STATS: Record<Role, Array<{ label: string; rate: string }>> = {
   H: [{ label: 'HR', rate: 'hr_pct' }, { label: 'BB', rate: 'bb_pct' }, { label: 'K', rate: 'k_pct' }],
   P: [],
 }
-const REGULAR: Record<Role, string> = { H: '300 PA', P: '100 IP' }
+// Playing time is shown for h1 only. The hurdle model is backtested at h1 only (make pt-backtest),
+// and at h2+ it feeds its own simulated healthy seasons back in as the recent-PT feature, so expected
+// PT rises with age for players whose recent PT was injury-depressed (Judge: 545/579/620/646 PA at
+// ages 35-38 while his wOBA declines .419 to .369). We do not display a number we have not validated.
+const PT_MAX_HORIZON = 1
 
 const isNum = (v: number | null | undefined): v is number => v !== null && v !== undefined && Number.isFinite(v)
 const pctInt = (v: number | null | undefined) => (isNum(v) ? `${Math.round(v * 100)}%` : '—')
@@ -36,7 +40,6 @@ export default function AgingOutlook({
   const counts = COUNT_STATS[role]
   const ptBy = new Map(playingTime.map(r => [r.horizon, r]))
   const hasPT = playingTime.some(r => isNum(r.pt_expected))
-  const last = playingTime.length ? playingTime[playingTime.length - 1] : undefined
   const rateOf = (stat: string, h: number) => (projections[stat] ?? []).find(r => r.horizon === h)?.mean ?? null
   const nCols = 3 + 1 + counts.length + stats.length
 
@@ -44,11 +47,6 @@ export default function AgingOutlook({
     <div className="aging-grid">
       <div className="card">
         <h3>Outlook (h = 1…4)</h3>
-        {hasPT && last && isNum(last.p_regular) && (
-          <div className="outlook-chip">
-            Chance still an MLB regular in {last.season} (≥ {REGULAR[role]}): <strong>{pctInt(last.p_regular)}</strong>
-          </div>
-        )}
         <div className="table-scroll">
           <table className="outlook-table">
             <thead>
@@ -66,19 +64,28 @@ export default function AgingOutlook({
                 const pt = ptBy.get(p.horizon)
                 const exp = pt && isNum(pt.pt_expected) ? pt.pt_expected : null
                 const cond = exp !== null && pt && isNum(pt.p_play) && pt.p_play > 0 ? exp / pt.p_play : null
-                const lines: Array<{ key: string; label: string; pt: number | null }> = hasPT
+                const ptShown = hasPT && p.horizon <= PT_MAX_HORIZON
+                const lines: Array<{ key: string; label: string; pt: number | null }> = ptShown
                   ? [{ key: 'if', label: 'If he plays', pt: cond }, { key: 'exp', label: 'Expected', pt: exp }]
                   : [{ key: 'if', label: '', pt: null }]
                 return lines.map((line, li) => (
                   <tr key={`${p.horizon}-${line.key}`} className={li === 0 ? 'outlook-first' : 'outlook-second'}>
                     {li === 0 && <td rowSpan={lines.length}>{p.season}</td>}
                     {li === 0 && <td rowSpan={lines.length} className="numeric">{p.age ?? ''}</td>}
-                    <td className="outlook-line">{line.label}</td>
-                    <td className="numeric">{int0(line.pt)}</td>
-                    {counts.map(c => {
-                      const r = rateOf(c.rate, p.horizon)
-                      return <td key={c.label} className="numeric">{isNum(r) && isNum(line.pt) ? int0(r * line.pt) : '—'}</td>
-                    })}
+                    {hasPT && !ptShown ? (
+                      <td colSpan={2 + counts.length} className="muted outlook-note">
+                        rates only — playing time projected one year ahead
+                      </td>
+                    ) : (
+                      <>
+                        <td className="outlook-line">{line.label}</td>
+                        <td className="numeric">{int0(line.pt)}</td>
+                        {counts.map(c => {
+                          const r = rateOf(c.rate, p.horizon)
+                          return <td key={c.label} className="numeric">{isNum(r) && isNum(line.pt) ? int0(r * line.pt) : '—'}</td>
+                        })}
+                      </>
+                    )}
                     {line.key === 'exp' ? (
                       <td colSpan={stats.length} className="numeric muted outlook-note">
                         rates as above · {pctInt(pt?.p_play)} chance he plays
@@ -105,7 +112,8 @@ export default function AgingOutlook({
                     <>
                       <strong>If he plays</strong>: {PT_LABEL[role]} given any MLB time, with the conditional rate projections.{' '}
                       <strong>Expected</strong>: includes the chance of no MLB time (playing-time hurdle model);
-                      counting stats = projected rate × {PT_LABEL[role]}.{' '}
+                      counting stats = projected rate × {PT_LABEL[role]}. Playing time is shown for year 1
+                      only; it is not backtested beyond that.{' '}
                     </>
                   ) : (
                     <>No playing-time outlook for this player (no MLB time in the last two seasons); rates are conditional on playing.{' '}</>

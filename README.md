@@ -73,8 +73,11 @@ Taken 2026-09-17, before the M2 lock and the M3 playing-time wiring, so the PT c
 
 ## Limitations
 
-- Beyond year 1, intervals are model-implied and have not been backtested. Old stars'
-  expected PT can rise with horizon (see memo §5).
+- Beyond year 1, intervals are model-implied and have not been backtested.
+- Playing time is displayed for year 1 only, deliberately. The PT model is backtested at h1 only,
+  and at h2+ it feeds its own simulated healthy seasons back in as recent PT, so injury-depressed
+  stars' PT rises with age (Judge 545 → 646 PA at 35–38 while wOBA falls .419 → .369). Years 2–4
+  show rates only (memo §5).
 - The production fit isn't fully converged: max r_hat 1.16 and 89 divergences across 12 fits.
 - Stages are fitted independently. No prospects, defense, baserunning or WAR.
 

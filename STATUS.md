@@ -29,6 +29,8 @@
   **nothing ships; production unchanged**. README language in §7. No new runs for Daniel.
 - [x] Phase 7 memo + README — Opus, 2026-09-18: `docs/research_memo.md`, `README.md`; M4 leakage
   test wired (`tests/test_m4_leakage.py`, HANDOFF ticked). App + screenshot review: Daniel.
+- [x] Outlook PT h1-only — Opus, 2026-09-18: AgingOutlook shows PA/IP + counting stats at h1 only;
+  h2–h4 rows are rates only (unvalidated PT feedback at h2+). Methodology, memo §5, README updated.
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -138,6 +140,19 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### Outlook playing time h1-only — Opus (2026-09-18, frontend + docs, no compute)
+- Decision: the hurdle PT model is backtested at h1 only (`make pt-backtest`); at h2+ it feeds its
+  own simulated healthy seasons back in as the recent-PT feature, so injury-depressed stars' PT
+  rises with age (Judge 545/579/620/646 PA at 35–38 while wOBA .419 → .369, checked against
+  `projections.parquet`). We don't display numbers we haven't validated.
+- `AgingOutlook.tsx`: h1 rows unchanged; h2–h4 rows keep the rate columns and replace the PT/count
+  cells + "chance he plays" line with "rates only — playing time projected one year ahead". Also
+  removed the "chance still an MLB regular in <h4 season>" chip (h4 `p_regular` is the same
+  unvalidated PT output). Footer notes PT is year-1 only.
+- Methodology "Known artifact" paragraph → "Playing time is shown for year 1 only" + a Limitations
+  bullet; memo §5 item 2 and README Limitations restated as a deliberate display decision.
+- `npm run build` passes. Model/artifacts unchanged. To show h2+ PT again: backtest h2+ PT or fix the feedback.
 
 ### Phase 7 write-up — Opus (2026-09-18, docs + one test, no compute)
 - `backend/tests/test_m4_leakage.py`: triples season-T counts + shifts season->=T league logits,
