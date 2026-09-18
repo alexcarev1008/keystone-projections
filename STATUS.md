@@ -31,6 +31,9 @@
   test wired (`tests/test_m4_leakage.py`, HANDOFF ticked). App + screenshot review: Daniel.
 - [x] Outlook PT h1-only — Opus, 2026-09-18: AgingOutlook shows PA/IP + counting stats at h1 only;
   h2–h4 rows are rates only (unvalidated PT feedback at h2+). Methodology, memo §5, README updated.
+- [x] Interview prep (teaching mission, $15) — Fable, 2026-09-18: full repo inspection + `docs/interview_prep.md`
+  (decision chain 1–9, adversarial arguments, ranked discrepancy list, 10 Q&A, "why didn't it work").
+  No model code touched; 4 presentation-only HANDOFF items filed.
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -45,6 +48,7 @@
 | M3 | $20 | Daniel fills in (Fable self-estimate ~$4: input ~110k, output ~12k) | ~$30 |
 | M3 follow-up | $8 | Daniel fills in (Fable self-estimate ~$2: input ~90k, output ~8k) | ~$32 |
 | M4 | $10 | Daniel fills in (Fable self-estimate ~$3: input ~180k, output ~14k) | ~$35 |
+| interview prep | $15 | Daniel fills in (Fable self-estimate ~$6: input ~230k, output ~18k) | ~$41 |
 
 ## Next command(s) for Daniel
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
@@ -144,6 +148,28 @@
 - **`make holdout` is now authorised — ONCE.** The three M2c HANDOFF items it waited on landed 2026-09-18 (see the ordered list at the top of this section).
 
 ## Results (paste summaries here, ≤ 30 lines each)
+
+### Interview prep — Fable (2026-09-18, teaching mission, read-only + docs)
+- Deliverable: `docs/interview_prep.md`. Inspected every backend module, tests (65 pass, verified),
+  frontend, git log, and the artifacts via pandas; every headline number in memo/README/M2–M4 docs
+  reproduced from committed files — no number failed to re-derive.
+- Discrepancies found (ranked in the doc §B, 4 filed as presentation-only HANDOFF items):
+  1. Waterfall (unanchored Tier 2 chain) vs headline q50 (Marcel-anchored) disagree on the same
+     page: H/wOBA mean gap −.018, max .088 (Judge .385 vs .418). Nothing on-page explains it.
+  2. meta.json "top HR parks" shows negative phi under "positive = HR-friendly" — phi level is
+     unidentified (constant shift trades off vs theta); only differences are meaningful.
+  3. Methodology Limitations still says "Projections are park-neutral" (stale post-M1/anchor).
+  4. CONTEXT.md regenerates with "holdout unspent" / pre-M2 equations / "no attrition model" —
+     hard-coded strings in diagnostics.py (~lines 670/679/691).
+  5. Softer items: ERA column ≡ FIP; two PT numbers ship (leaderboard Marcel 410 vs outlook
+     hurdle 545 for Judge); no test covers `_anchor_to_marcel`/waterfall_frame; band-widening
+     spot-check text still says ">95%" vs actual 17.6% (diagnosed not-a-bug in check A).
+- Sharpest adversarial points prepped (doc §A): shipped Marcel-points+Tier2-bands hybrid was never
+  itself coverage-scored (anchor shift ≈ half the q50→q10 distance — the re-score is cheap and
+  should be run); h2–h4 bands unbacktested; env shock perfectly correlated across stages while
+  stage talents are independent (both extremes wrong); n=4 sign-test gate had ~no power at the
+  observed ~2% effect; production r̂ 1.16 / 89 div in the fits that ship the bands.
+- No model code, no backtests, no artifact changes. Fable self-estimate ~$6.
 
 ### Queue close-out — Fable (2026-09-18, at Daniel's direction)
 - Outlook chip restores the threshold: "Chance still an MLB regular in 2027 (≥ 300 PA)" for H,

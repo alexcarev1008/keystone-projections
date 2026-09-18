@@ -229,6 +229,31 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   panel. Methodology gains a playing-time section with (a)–(c), and the Limitations bullets are
   updated. Fringe-veteran check, run through the real API on a scratch copy of production
   artifacts: McCutchen h1 is 42 expected PA vs 182 if he plays (HR 1.2 vs 5.2)._
+- [ ] (interview-prep, Fable-filed 2026-09-18, presentation only — no modelling change) The player
+  page's waterfall (unanchored Tier 2 chain) ends at a different number than the headline
+  projection (Marcel-anchored q50): H/wOBA mean gap −.018, max .088 (Judge .385 vs .418). Either
+  (a) add one sentence to the waterfall card + Methodology: "the waterfall shows the Bayesian
+  model's chain; the headline median is anchored to Marcel (§6 fallback), and the difference is
+  the anchor", or (b) append a final "Marcel anchor" step so it telescopes to the shipped q50 —
+  ✔ a reader of Judge's page can reconcile .385 vs .418 from on-page text; `npm run build` passes.
+- [ ] (interview-prep, Fable-filed 2026-09-18) `meta_dict` top/bottom HR parks report raw phi,
+  which is not identified in level (constant shift trades off against theta; top-3 list currently
+  shows negative phi under "positive = HR-friendly"). Centre phi before ranking/reporting
+  (`phi_centred = phi_mean - phi_mean.mean()`) and/or state on the Methodology page that only
+  differences between parks are meaningful — ✔ meta.json top parks all ≥ 0 after centring on the
+  next `make project`; Methodology sign note matches.
+- [ ] (interview-prep, Fable-filed 2026-09-18) `frontend/src/pages/Methodology.tsx` Limitations:
+  "Projections are park-neutral" is stale (park-aware scoring since M1; waterfall step 5 is "At
+  home park"; park-aware draws ship for park stages). Restate as: shipped *points* are
+  Marcel-anchored so the park term nets out of the h=1 median; bands/waterfall carry the
+  park-aware draws — ✔ `npm run build` passes.
+- [ ] (interview-prep, Fable-filed 2026-09-18) `backend/keystone/diagnostics.py` CONTEXT.md
+  template is stale (~lines 670/679/691): says "Holdout 2025 is unspent", "Projections
+  park-neutral, conditional on playing (no attrition model)", and prints the pre-M2 equations
+  without sigma_obs. Read holdout state from backtest.json, add the sigma_obs term to the
+  equation block, and mention the M3 hurdle — ✔ `make diagnostics` regenerates CONTEXT.md with
+  holdout SPENT and the locked-config equation; no other file changes.
+
 - [x] (M3) CLI + backtest hook (small): add `keystone.pipeline` subcommand `pt-backtest` running
   `PT.backtest_pt(b.ps, C.DEV_TARGETS)` and printing the table (no JSON artifact needed) — ✔ command
   runs end-to-end in ≲3 min and matches docs/fable/M3_playing_time.md §3 numbers at seed 1.
