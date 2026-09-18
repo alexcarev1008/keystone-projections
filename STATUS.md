@@ -14,7 +14,7 @@
 - [x] M1 Statistical red team ($15) — done 2026-09-17, see `docs/fable/M1_audit.md` → Opus wires handoff → Daniel re-runs → `make diagnostics`
 - [x] M2a Model research: diagnose + build ($20) — done 2026-09-17, see `docs/fable/M2_experiments.md` → Daniel full backtests (commands below)
 - [x] M2b Judge + iterate ($20) — done 2026-09-18: E2/E4 rejected vs pre-registrations, E3 unjudged (run missing), E5/E6 built + quick-validated → Daniel full backtests (commands below)
-- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wired the 3 holdout-blocking HANDOFF items 2026-09-18 (item 4, Methodology + meta docs, still open) → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
+- [x] M2c Judge + lock ($15) — done 2026-09-18: E5+E6 ACCEPTED (locked config `--obs-noise --env-mode shock`), E3 + t4 rejected, correlated stages declined with reasons → Opus wired the 3 holdout-blocking HANDOFF items 2026-09-18 (item 4, Methodology + meta docs, still open) → holdout attempt 1 misfired (ruled invalid, see below) → Opus repaired state + writer guard 2026-09-18 → Daniel `make holdout` (once) → paste result → `make project` + `make diagnostics`
 - [ ] M3 Playing time + attrition hurdle model ($20, first to cut) → Opus wires
 - [ ] M4 ML challenger + formal model comparison ($10) → Opus wires anything that ships
 - Memo/README: Opus (Phase 7). App + screenshot review: Daniel. No Fable budget for either.
@@ -39,10 +39,15 @@
   sidecars). Full record + ruling + pre-commitments: `M2_experiments.md` §"The 2025 holdout".
   One re-run with the locked config is authorised (config was locked and committed before any
   2025 number existed; no modelling decision changes on the misfire numbers). In order:
-  1. **Opus:** the two new URGENT M2c HANDOFF items — state repair (restore canonical from the
-     clean E5E6 copies in `m2/`, archive the misfire file) and the writer-level guard +
-     regression test.
-  2. **Daniel:** `make holdout` — the authorised re-run, ONCE, no `--force` needed after the
+  1. ~~**Opus:** the two new URGENT M2c HANDOFF items~~ DONE 2026-09-18 (`handoff: holdout
+     repair`). Canonical `backtest.json` + both sidecars were restored byte-identical from the
+     m2 E5E6 copies: `holdout_target: null`, flags `shock`/`obs_noise: true`, no 2025 rows
+     anywhere. Attempt 1 is archived as `m2/backtest_holdout_2025_misfire.json` plus
+     `m2/backtest_holdout_2025_misfire_{predictions,posteriors}.parquet`. `bt.run(holdout=True)`
+     now refuses a flag mismatch before loading or fitting, and again before writing. The guard
+     is covered by regression tests; `make test` passes (49). `make diagnostics` is green; the
+     context pack is unchanged apart from its timestamp.
+  2. **Daniel — NEXT:** `make holdout` — the authorised re-run, ONCE, no `--force` needed after the
      repair. Verify the printed flags header says `env_mode: shock, obs_noise: True` before
      letting it proceed past the first line. After this run the holdout is spent for good.
   3. Paste the printed 2025 table back into the M2c Fable session. Pre-registered expectation

@@ -738,6 +738,18 @@ POST_SCHEMA = ["target", "role", "tier", "stage",
 
 # ---------------------------------------------------------------- entry point
 
+def _refuse_holdout_flag_mismatch(prev: dict, flags: dict, out: Path) -> None:
+    """Writer-level twin of `pipeline holdout`'s check. Holdout attempt 1 (M2_experiments.md
+    §"The 2025 holdout") reached this writer with the old config and stamped its flags over the
+    promoted dev file; the holdout must score exactly the config the dev gates were decided on."""
+    dev_flags = prev.get("experiment_flags") or {}
+    if {k: dev_flags.get(k) for k in flags} != flags:
+        raise SystemExit(f"[backtest] holdout refused: model config {flags} does not match "
+                         f"experiment_flags {prev.get('experiment_flags')} in {out.name}; "
+                         f"{out.name} and its sidecars left untouched. Promote the matching dev "
+                         f"run to {out.name} first.")
+
+
 def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=None,
         out: Path | None = None, holdout: bool = False, seed: int = 1,
         park_aware: bool = True, env_mode: str = "shock", rp_effect: bool = False,
@@ -753,9 +765,11 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
     if out is None:
         out = C.ARTIFACTS / ("backtest_quick.json" if quick else "backtest.json")
     out = Path(out)
+    flags = dict(env_mode=env_mode, rp_effect=rp_effect, innov=innov, obs_noise=obs_noise)
+    if holdout and out.exists():                       # before loading, fitting or writing
+        _refuse_holdout_flag_mismatch(json.loads(out.read_text()), flags, out)
 
     b = load_bundle()
-    flags = dict(env_mode=env_mode, rp_effect=rp_effect, innov=innov, obs_noise=obs_noise)
     print(f"[backtest] mode={mode} tier={tier} targets={targets} roles={roles} "
           f"sampling={sampling} park_aware={park_aware} flags={flags} -> {out.name}")
 
@@ -774,6 +788,8 @@ def run(targets=None, tier: int = 2, quick: bool = False, roles=None, stages=Non
             new_posts += po
 
     old = json.loads(out.read_text()) if out.exists() else {}
+    if holdout and out.exists():                       # again: the file may have changed mid-fit
+        _refuse_holdout_flag_mismatch(old, flags, out)
     rows = _merge_rows(old.get("rows", []), new_rows)
     all_targets = sorted(set(old.get("targets", [])) | set(targets))
     dev_targets = [t for t in all_targets if t != C.HOLDOUT_TARGET] or targets

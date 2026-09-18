@@ -64,7 +64,7 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `model_config: {obs_noise: true, env_mode: "shock"}` and per-stage sigma_obs alongside tau;
   (c) Validation section: coverage now in band for both roles (H .82, P .76), gates still
   Marcel on points, and the M2 story in one paragraph — ✔ `npm run build` passes.
-- [ ] (M2c, URGENT — BEFORE the holdout re-run) repair the canonical state after the
+- [x] (M2c, URGENT — BEFORE the holdout re-run) repair the canonical state after the
   misconfigured 2025 holdout (M2_experiments.md §"The 2025 holdout"): the 14:53 run raced the
   `handoff: M2c` commit and merged old-config (`mean3`/`obs_noise:false`) 2025 rows into the
   promoted `backtest.json`, stamped its `experiment_flags` over the file, set
@@ -77,7 +77,13 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   `experiment_flags: {env_mode: shock, obs_noise: true}`, no 2025 rows; sidecars have no 2025
   rows; `make diagnostics` green; `make holdout` then runs WITHOUT `--force` and its printed
   flags header shows the locked config.
-- [ ] (M2c) guard hardening + regression test for the failure that let attempt 1 through —
+  _Opus 2026-09-18: done; restored files are byte-identical to the m2 E5E6 copies. The misfire
+  sidecars were archived too rather than overwritten:
+  `m2/backtest_holdout_2025_misfire_{predictions,posteriors}.parquet`. Note: `handoff: M2c`
+  (22bb1dc, 14:54) had committed the chimera `backtest.json`; this commit restores git as well.
+  `make holdout` NOT run (Daniel's one-shot). Its preconditions were checked as plain logic on the
+  restored file: gates present, `holdout_target` null, CLI and writer flag checks pass._
+- [x] (M2c) guard hardening + regression test for the failure that let attempt 1 through —
   the CLI guard exists but lives only in `cmd_holdout`, so any path that reaches
   `bt.run(holdout=True)` directly (stale code, a script, a future refactor) can still score a
   mismatched config and overwrite the dev file's `experiment_flags`. (a) In
@@ -92,6 +98,13 @@ Opus: implement unchecked items in order, tick them, commit `handoff: M<n>`. Don
   past the guard (monkeypatch the fitting to a stub). Also test `cmd_holdout` end-to-end via
   `pipeline.main(["holdout", ...])` on the mismatched fixture → SystemExit — ✔ `make test`
   green; the new tests fail if either guard is removed.
+  _Opus 2026-09-18: `_refuse_holdout_flag_mismatch` runs in `run()` before `load_bundle()`, and
+  again on the re-read just before `write_json`, because the file can change during a
+  25-minute fit. Tests are in `test_m2c_locked_config.py`: the writer refuses on mean3 and
+  missing-flag fixtures (file byte-unchanged, nothing loaded or fitted, no sidecars); it
+  proceeds when flags match; it re-checks when the file changes mid-fit; and the CLI refuses
+  end-to-end through the real `bt.run`. Mutation-checked: removing the writer guard or the CLI
+  guard turns tests red. 49 pass._
 - [ ] (M2b) `backend/keystone/eval/backtest.py` — sidecar filenames collide across experiment
   runs: `run()` writes `backtest_predictions{_quick}.parquet` / `backtest_posteriors{_quick}.parquet`
   into `out.parent`, so consecutive `--out ../data/artifacts/m2/backtest_E*.json` runs overwrite
