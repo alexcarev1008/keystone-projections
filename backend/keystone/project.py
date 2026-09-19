@@ -648,14 +648,20 @@ def meta_dict(fits: dict, roles: list[str], stage_map: dict, window_end: int, ho
                      "divergences": f.divergences}
             if stage == "hr" and f.phi_mean is not None and len(f.venues):
                 venue_names = _venue_names(b)
-                order = np.argsort(f.phi_mean)
+                # phi's level is unidentified — a constant shift trades off against
+                # theta (every player carries total park exposure 0.5), so only
+                # differences between parks are meaningful. Report phi centred at 0.
+                phi_centred = np.asarray(f.phi_mean, dtype=float) - float(np.mean(f.phi_mean))
+                order = np.argsort(phi_centred)
                 top = [{"venue_id": int(f.venues[i]),
                         "venue_name": venue_names.get(int(f.venues[i])),
-                        "phi": float(f.phi_mean[i])} for i in order[-3:][::-1]]
+                        "phi": float(phi_centred[i])} for i in order[-3:][::-1]]
                 bot = [{"venue_id": int(f.venues[i]),
                         "venue_name": venue_names.get(int(f.venues[i])),
-                        "phi": float(f.phi_mean[i])} for i in order[:3]]
-                entry.update({"top_hr_parks": top, "bottom_hr_parks": bot})
+                        "phi": float(phi_centred[i])} for i in order[:3]]
+                entry.update({"top_hr_parks": top, "bottom_hr_parks": bot,
+                              "phi_note": "centred: phi_reported = phi_raw - mean(phi_raw); "
+                                          "only park differences are identified."})
             stages_summary[f"{role}/{stage}"] = entry
             if f.max_rhat is not None:
                 max_rhat = f.max_rhat if max_rhat is None else max(max_rhat, f.max_rhat)

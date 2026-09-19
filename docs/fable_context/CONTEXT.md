@@ -1,30 +1,37 @@
 # KEYSTONE — Fable context pack
 
-generated: 2026-09-18T22:20:29+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel
+generated: 2026-09-18T23:53:22+00:00 · artifacts window_end: 2026 · projection_season: 2027 · production_tier: H=marcel P=marcel · model_config: obs_noise=True env_mode=shock
 
 ## 1. What KEYSTONE is (one paragraph)
 
 Bayesian component-based MLB player projection system: seven binomial stages per PA'
 chain (k, bb, hbp, hr, hit_bip, xbh, triple for hitters; the first five for pitchers).
 Marcel is Tier 1; a non-centred hierarchical state-space model per (role, stage) is
-Tier 2 (aging g[age], talent-drift tau, park effects on batted-ball stages); Statcast
-contact-quality indicators plug into three stages as Tier 3. Stages are fitted
-independently and combined index-by-index into derived stats via a verified formula
-shared by actuals, projections and simulations. Frontend is React + Recharts served
-read-only by FastAPI over parquet + JSON artifacts.
+Tier 2 (aging g[age], talent-drift tau, transient season noise sigma_obs, park effects
+on batted-ball stages, and a common league-environment shock at projection time);
+Statcast contact-quality indicators plug into three stages as Tier 3. Playing time is
+a separate Bayesian hurdle model (M3, `models/playing_time.py`): P(plays) × E[PT|plays]
+with a talent covariate, feeding p_play / pt_expected / p_regular per horizon into the
+projection artifacts. Stages are fitted independently and combined index-by-index into
+derived stats via a verified formula shared by actuals, projections and simulations.
+Frontend is React + Recharts served read-only by FastAPI over parquet + JSON artifacts.
 
-## 2. Model equations (MANUAL.md §5.3, reproduced)
+## 2. Model equations (MANUAL.md §5.3, locked config obs_noise + env shock)
 
 ```
 theta[i, first] = lam * z(log PA'_first) + sigma_pop * e
 theta[i, t]     = theta[i, t-1] + g[age[i, t]] + tau * e
-y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park . phi))
+y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park . phi + sigma_obs * eps))
 ```
 Priors: tau ~ HalfNormal(.3), sigma_pop ~ HalfNormal(1), lam ~ N(0, .5),
         g0 ~ N(0, .1), g_step_sd ~ HalfNormal(.02), park_sd ~ HalfNormal(.1),
         phi ~ N(0, 1) * park_sd. Non-centred parameterisation, nutpie sampler.
+        sigma_obs ~ HalfNormal(.2), non-persistent (never enters the walk).
+Projection-time env shock: per posterior draw, one N(0, sigma_env) shift shared
+across players and horizons (sigma_env = sd of yoy league logit changes).
 Tier 3 adds a second Binomial on the same theta with (barrels/BBE, ev95plus/BBE).
-Projections park-neutral, conditional on playing (no attrition model).
+Projections use park-aware draws for park stages (M1); the shipped h=1 median is
+Marcel-anchored (§6 fallback) because Tier 2 didn't clear the point-projection gate.
 
 ## 3. Production tier and gate results
 
@@ -36,8 +43,7 @@ Projections park-neutral, conditional on playing (no attrition model).
 Gate rule (§6): key stat is wOBA (H) / FIP (P). Tier 2 ships if RMSE <= Marcel in
 3 of 4 dev targets AND mean 80% coverage in [0.75, 0.85]. Tier 3 ships if it clears
 the same bar vs Tier 2. If Tier 2 fails, production is **Marcel points + Tier 2
-bands** and the Methodology page says so plainly. Holdout 2025 is unspent (deferred
-until after M2b — see STATUS.md).
+bands** and the Methodology page says so plainly. Holdout 2025 is **SPENT** (locked-config run, one-shot); scored rows live in `backtest.json`.
 
 ## 4. Data coverage
 

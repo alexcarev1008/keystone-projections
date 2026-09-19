@@ -127,6 +127,27 @@ export default function Player() {
       <div className="card">
         <h2>Why this projection ({statLabel(keyStat)})</h2>
         <Waterfall rows={data.waterfall} stat={keyStat} />
+        {(() => {
+          const wfFinal = [...data.waterfall]
+            .filter(r => r.stat === keyStat && r.value != null && Number.isFinite(r.value as number))
+            .sort((a, b) => a.step - b.step)
+            .pop()?.value ?? null
+          const headline = h1Quantiles(data, keyStat).q50
+          if (wfFinal === null || headline === null) return null
+          const gap = (headline as number) - (wfFinal as number)
+          const sign = gap >= 0 ? '+' : ''
+          return (
+            <div className="muted band-note">
+              This waterfall walks the Bayesian model's own chain and ends at{' '}
+              <strong>{fmtStat(keyStat, wfFinal)}</strong>. The headline projection above
+              is <strong>{fmtStat(keyStat, headline)}</strong> — Tier 2 didn't clear the
+              point-projection gate, so shipped medians are anchored to Marcel (MANUAL §6);
+              the gap ({sign}{fmtStat(keyStat, gap)}) is that anchor. Tier 2's spread and
+              aging trajectory around the anchor are what the bands and the h=2..4
+              projections use.
+            </div>
+          )
+        })()}
       </div>
 
       <div>

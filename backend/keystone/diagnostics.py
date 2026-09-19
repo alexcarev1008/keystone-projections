@@ -638,36 +638,80 @@ def build_context_md(bt: dict, meta: dict, b: Bundle, counts: dict,
     hit_bip_h = stages_meta.get("H/hit_bip", {})
     hit_bip_p = stages_meta.get("P/hit_bip", {})
 
+    # Locked-config toggles read from meta (falls back to legacy pre-M2 wording if missing).
+    cfg = meta.get("model_config") or {}
+    obs_noise_on = bool(cfg.get("obs_noise"))
+    env_mode = cfg.get("env_mode", "mean3")
+    holdout_target = bt.get("holdout_target")
+    holdout_rows = [r for r in (bt.get("rows") or [])
+                    if r.get("target") == holdout_target and r.get("stat") != "_diagnostics"]
+    holdout_spent = holdout_target is not None and len(holdout_rows) > 0
+    if holdout_spent:
+        holdout_line = (f"Holdout {holdout_target} is **SPENT** (locked-config run, one-shot);"
+                        f" scored rows live in `backtest.json`.")
+    elif holdout_target is not None:
+        holdout_line = f"Holdout {holdout_target} target is set but no scored rows on disk."
+    else:
+        holdout_line = "Holdout 2025 is unspent — see STATUS.md before running."
+
+    eq_lines = [
+        "theta[i, first] = lam * z(log PA'_first) + sigma_pop * e",
+        "theta[i, t]     = theta[i, t-1] + g[age[i, t]] + tau * e",
+    ]
+    if obs_noise_on:
+        eq_lines.append(
+            "y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t]"
+            " + X_park . phi + sigma_obs * eps))")
+    else:
+        eq_lines.append(
+            "y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t]"
+            " + X_park . phi))")
+
+    prior_lines = [
+        "Priors: tau ~ HalfNormal(.3), sigma_pop ~ HalfNormal(1), lam ~ N(0, .5),",
+        "        g0 ~ N(0, .1), g_step_sd ~ HalfNormal(.02), park_sd ~ HalfNormal(.1),",
+        "        phi ~ N(0, 1) * park_sd. Non-centred parameterisation, nutpie sampler.",
+    ]
+    if obs_noise_on:
+        prior_lines.append(
+            "        sigma_obs ~ HalfNormal(.2), non-persistent (never enters the walk).")
+    if env_mode == "shock":
+        prior_lines.append(
+            "Projection-time env shock: per posterior draw, one N(0, sigma_env) shift shared")
+        prior_lines.append(
+            "across players and horizons (sigma_env = sd of yoy league logit changes).")
+
     lines = [
         "# KEYSTONE — Fable context pack",
         "",
         f"generated: {datetime.now(timezone.utc).isoformat(timespec='seconds')} · "
         f"artifacts window_end: {meta.get('window_end')} · projection_season: "
-        f"{meta.get('projection_season')} · production_tier: H={prod.get('H')} P={prod.get('P')}",
+        f"{meta.get('projection_season')} · production_tier: H={prod.get('H')} P={prod.get('P')}"
+        f" · model_config: obs_noise={obs_noise_on} env_mode={env_mode}",
         "",
         "## 1. What KEYSTONE is (one paragraph)",
         "",
         "Bayesian component-based MLB player projection system: seven binomial stages per PA'",
         "chain (k, bb, hbp, hr, hit_bip, xbh, triple for hitters; the first five for pitchers).",
         "Marcel is Tier 1; a non-centred hierarchical state-space model per (role, stage) is",
-        "Tier 2 (aging g[age], talent-drift tau, park effects on batted-ball stages); Statcast",
-        "contact-quality indicators plug into three stages as Tier 3. Stages are fitted",
-        "independently and combined index-by-index into derived stats via a verified formula",
-        "shared by actuals, projections and simulations. Frontend is React + Recharts served",
-        "read-only by FastAPI over parquet + JSON artifacts.",
+        "Tier 2 (aging g[age], talent-drift tau, transient season noise sigma_obs, park effects",
+        "on batted-ball stages, and a common league-environment shock at projection time);",
+        "Statcast contact-quality indicators plug into three stages as Tier 3. Playing time is",
+        "a separate Bayesian hurdle model (M3, `models/playing_time.py`): P(plays) × E[PT|plays]",
+        "with a talent covariate, feeding p_play / pt_expected / p_regular per horizon into the",
+        "projection artifacts. Stages are fitted independently and combined index-by-index into",
+        "derived stats via a verified formula shared by actuals, projections and simulations.",
+        "Frontend is React + Recharts served read-only by FastAPI over parquet + JSON artifacts.",
         "",
-        "## 2. Model equations (MANUAL.md §5.3, reproduced)",
+        "## 2. Model equations (MANUAL.md §5.3, locked config obs_noise + env shock)",
         "",
         "```",
-        "theta[i, first] = lam * z(log PA'_first) + sigma_pop * e",
-        "theta[i, t]     = theta[i, t-1] + g[age[i, t]] + tau * e",
-        "y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park . phi))",
+        *eq_lines,
         "```",
-        "Priors: tau ~ HalfNormal(.3), sigma_pop ~ HalfNormal(1), lam ~ N(0, .5),",
-        "        g0 ~ N(0, .1), g_step_sd ~ HalfNormal(.02), park_sd ~ HalfNormal(.1),",
-        "        phi ~ N(0, 1) * park_sd. Non-centred parameterisation, nutpie sampler.",
+        *prior_lines,
         "Tier 3 adds a second Binomial on the same theta with (barrels/BBE, ev95plus/BBE).",
-        "Projections park-neutral, conditional on playing (no attrition model).",
+        "Projections use park-aware draws for park stages (M1); the shipped h=1 median is",
+        "Marcel-anchored (§6 fallback) because Tier 2 didn't clear the point-projection gate.",
         "",
         "## 3. Production tier and gate results",
         "",
@@ -676,8 +720,7 @@ def build_context_md(bt: dict, meta: dict, b: Bundle, counts: dict,
         f"Gate rule (§6): key stat is wOBA (H) / FIP (P). Tier 2 ships if RMSE <= Marcel in",
         f"3 of 4 dev targets AND mean 80% coverage in [0.75, 0.85]. Tier 3 ships if it clears",
         f"the same bar vs Tier 2. If Tier 2 fails, production is **Marcel points + Tier 2",
-        f"bands** and the Methodology page says so plainly. Holdout 2025 is unspent (deferred",
-        f"until after M2b — see STATUS.md).",
+        f"bands** and the Methodology page says so plainly. {holdout_line}",
         "",
         "## 4. Data coverage",
         "",

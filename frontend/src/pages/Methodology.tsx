@@ -277,22 +277,39 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
           spread, i.e. pitchers own far less of their BABIP than hitters do.
         </p>
       )}
-      {hrParks?.top_hr_parks && hrParks?.bottom_hr_parks && (
-        <div>
-          <p style={{ marginTop: 12 }}>Top/bottom HR parks (φ, hitter HR stage; positive = HR-friendly):</p>
-          <table>
-            <thead><tr><th>Park</th><th className="numeric">φ</th></tr></thead>
-            <tbody>
-              {hrParks.top_hr_parks.map(p => (
-                <tr key={`t-${p.venue_id}`}><td>{p.venue_name}</td><td className="numeric">{p.phi >= 0 ? '+' : ''}{p.phi.toFixed(3)}</td></tr>
-              ))}
-              {hrParks.bottom_hr_parks.map(p => (
-                <tr key={`b-${p.venue_id}`}><td>{p.venue_name}</td><td className="numeric">{p.phi >= 0 ? '+' : ''}{p.phi.toFixed(3)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {hrParks?.top_hr_parks && hrParks?.bottom_hr_parks && (() => {
+        // φ's level is unidentified — a constant shift trades off against theta (each
+        // player's total park exposure sums to 0.5), so only differences between parks
+        // are meaningful. Render Δφ relative to the mean of the six reported parks.
+        // The next `make project` will emit φ already centred (project.meta_dict).
+        const all = [...hrParks.top_hr_parks, ...hrParks.bottom_hr_parks]
+        const bar = all.reduce((a, p) => a + p.phi, 0) / all.length
+        const already = Math.abs(bar) < 1e-6
+        const disp = (p: { phi: number }) => (already ? p.phi : p.phi - bar)
+        return (
+          <div>
+            <p style={{ marginTop: 12 }}>
+              Top/bottom HR parks — Δφ vs the mean of the six shown (hitter HR stage). Only
+              differences between parks are identified: a common shift in φ trades off against
+              the talent term, so we report Δφ, not raw φ. Positive Δφ ≡ HR-friendlier than the
+              typical park in this list.
+            </p>
+            <table>
+              <thead><tr><th>Park</th><th className="numeric">Δφ</th></tr></thead>
+              <tbody>
+                {hrParks.top_hr_parks.map(p => {
+                  const v = disp(p)
+                  return <tr key={`t-${p.venue_id}`}><td>{p.venue_name}</td><td className="numeric">{v >= 0 ? '+' : ''}{v.toFixed(3)}</td></tr>
+                })}
+                {hrParks.bottom_hr_parks.map(p => {
+                  const v = disp(p)
+                  return <tr key={`b-${p.venue_id}`}><td>{p.venue_name}</td><td className="numeric">{v >= 0 ? '+' : ''}{v.toFixed(3)}</td></tr>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
       <p className="muted" style={{ marginTop: 12, fontSize: 12 }}>
         Sampler health across production fits: max r̂ = {meta.max_rhat?.toFixed(3)}, total divergences = {meta.total_divergences}.
       </p>
@@ -401,7 +418,20 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
         <li>The outlook shows playing time for year 1 only, by design: at h2+ the hurdle model feeds its own simulated healthy seasons back in as recent PT, so injury-depressed stars' PT rises with age, and only h1 is backtested.</li>
         <li>Headline playing time is Marcel's. Attrition enters only through the multi-year outlook's hurdle model, which has no role-change or injury-report information.</li>
         <li>Stages are fit independently; between-stage correlation is ignored when combining.</li>
-        <li>Projections are park-neutral. Rate projections are conditional on the player playing; the outlook's "expected" line is not.</li>
+        <li>
+          Park handling: park-aware draws ship for the batted-ball stages (hr, hit_bip, xbh, 3B),
+          in each player's last-observed home park; the M1 backtest scores in that same park. The
+          shipped h=1 <em>median</em> is Marcel-anchored (§6 fallback), so the park term nets out
+          of the point projection but is present in the bands and in the waterfall's "At home
+          park" step. Rate projections are conditional on the player playing; the outlook's
+          "expected" line is not.
+        </li>
+        <li>
+          Pitcher ERA in the projection tables is FIP re-labelled: league FIP = league ERA by
+          construction of cFIP (see <code>league.pitcher_constants</code>), so the projected ERA
+          column carries no information beyond FIP for a single player-season. Both are shown
+          because different readers ask for different names.
+        </li>
         <li>Survivor bias: the eval population is players with ≥ 200 PA'/BF' in T and any prior history.</li>
         <li>2026 data is through {meta.data_through} — the season is not complete; artifacts should be re-run after the regular season ends.</li>
       </ul>
