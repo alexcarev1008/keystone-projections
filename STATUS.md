@@ -34,6 +34,17 @@
 - [x] Interview prep (teaching mission, $15) — Fable, 2026-09-18: full repo inspection + `docs/interview_prep.md`
   (decision chain 1–9, adversarial arguments, ranked discrepancy list, 10 Q&A, "why didn't it work").
   No model code touched; 4 presentation-only HANDOFF items filed.
+- [x] Coverage re-score of the shipped intervals — Fable, 2026-09-18: pre-registration committed
+  first (`docs/coverage_rescore.md` + commit `c295b4f`); `backend/keystone/eval/coverage_rescore.py`
+  + 8 unit tests; ran against frozen sidecar, no refits. **Verdict (c) — coverage breaks.** Under
+  the pre-registered rule both legs fail: dev key-stat PA-weighted mean H/wOBA .629, P/FIP .584
+  (need both in [.75,.85]); 2025 holdout 0/10 rows in-band. Two mechanisms, isolated: the missing
+  binomial-noise layer between the posterior-predictive intervals scored by `interval_coverage`
+  (which are the ones the memo's .83/.75 quotes) and the posterior-on-rate quantiles that
+  `projections.parquet` actually ships is the dominant one; Marcel anchoring adds a per-stat shift
+  of a few points (median |shift|/width ≈ .13–.22, 99th pctile .57–.91). Per the pre-registered
+  commitment the memo, README and Methodology were corrected in the same commit — no model
+  changes. Two follow-on questions filed below.
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -863,6 +874,22 @@ Measured on real data with the wired `pt_outlook_frame` (projection season 2027,
    the most stable skills, where a hierarchical model should be at its strongest. Lower priority
    than 1 and 2, but it does not fit the "shrinkage helps unstable stats" story and may share a
    cause with 2 (H/bb is the second-largest divergence cluster, 47).
+
+## Questions for Fable (from coverage re-score, filed not executed on)
+1. **Should production ship posterior-predictive bands?** The re-score
+   (`docs/coverage_rescore.md`) shows the .83/.75 cov80 claim describes intervals from
+   `interval_coverage` (posterior + binomial season simulation), not the posterior-on-rate
+   bands `projections.parquet` writes. Adding `simulate_season` at each player's projected
+   PA (from the PT hurdle) at write time would make what ships match what got validated. It
+   is a pipeline change (produce anchored per-stage draws, simulate seasons, take quantiles
+   of the simulated derived stats), not a modelling change. Should this ship? Pre-register
+   before running.
+2. **What are the intended user semantics of "80% band" on a player page?** If it is
+   "80% of realized seasons fall here", the answer to (1) is yes and the band should be the
+   posterior-predictive one. If it is "80% posterior on true-talent rate", the current
+   on-page band is correct as-is and the memo/README/Methodology are the only thing to
+   correct — which is what today's commit does. This is a product decision, not a
+   statistical one.
 
 ## Blockers
 - none

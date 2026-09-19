@@ -391,10 +391,26 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
             for pitchers. Two changes were tested against pre-registered expectations and accepted: the
             season-level noise term and the league-environment shock. A recency-weighted league
             point, fat-tailed talent innovations and a reliever effect were rejected, and correlated
-            stages were considered but not built. Mean 80% coverage is now in
+            stages were considered but not built. Mean 80% coverage of the
+            <em> posterior-predictive intervals scored by the backtest harness</em> is now in
             the [.75, .85] band for both roles (H {cov('H')}, P {cov('P')}). Point accuracy still does not
             clear the gate against Marcel, so shipped points remain Marcel's. The configuration was
             locked and committed before any {holdoutTarget ?? 2025} number was computed.
+          </p>
+          <p className="muted" style={{ fontSize: 12 }}>
+            <strong>Two different band objects, one caveat.</strong> The cov80 figures above
+            describe the intervals scored by <code>interval_coverage</code> in the backtest harness
+            (Tier 2 stage draws + binomial season simulation at each player's actual PA/IP —
+            posterior-predictive of the realized season rate). The bands rendered on the player
+            page come from <code>projections.parquet</code> and are a different object: posterior
+            quantiles of the derived stat, Marcel-anchored, without a binomial-noise layer on top.
+            A pre-registered re-score of the frozen 2021–2025 sidecar (
+            <code>docs/coverage_rescore.md</code>) found the on-page bands cover realized 2025
+            outcomes at 40–75% by stat (0 of 10 rows in [.75, .85] on 2025). What the on-page
+            bands honestly describe is posterior uncertainty about a player's true-talent rate;
+            the wider posterior-predictive object is what carries the .83/.75 calibration claim.
+            The model was not retuned in response — a fix would be to ship the posterior-predictive
+            bands, which is a pipeline decision, not a modelling one.
           </p>
           {holdoutTarget !== null && (holdoutRows.length === 0 ? (
             <p>Holdout target: {holdoutTarget}. Unspent — reserved for after model iteration.</p>
@@ -404,9 +420,13 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
               <HoldoutTable bt={bt} target={holdoutTarget} />
               <p style={{ marginTop: 12 }}>
                 On the untouched {holdoutTarget} season, Tier 2 scored slightly <em>below</em> Marcel on
-                both key stats (wOBA and FIP RMSE), while its 80% intervals stayed in band. One season
-                can't settle the points question either way. It does confirm the one claim the
-                shipped bands make, that they are calibrated.
+                both key stats (wOBA and FIP RMSE), while its 80% posterior-predictive intervals stayed
+                in band. One season can't settle the points question either way. And the calibration
+                claim is narrower than earlier drafts of this page said: it is the
+                posterior-predictive interval object (the one scored by <code>interval_coverage</code>)
+                that lands in band. The bands rendered above on the player page are a different
+                object; see the note earlier in this section and{' '}
+                <code>docs/coverage_rescore.md</code>.
               </p>
             </div>
           ))}

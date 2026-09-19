@@ -10,9 +10,21 @@ It didn't clear the bar. Across the four development seasons (2021–2024) the l
 beat Marcel on hitter wOBA in 2 of 4 years and on pitcher FIP in 1 of 4. The shipping gate needed
 3 of 4. On the one-time 2025 holdout it lost both key stats narrowly (wOBA .0309 vs .0305, FIP
 .7399 vs .7317), even though it won 5 of the 8 component rows underneath them. So the system
-ships **Marcel's point projections with the Bayesian model's uncertainty bands**. Those bands are
-the part that did validate: 80% intervals covered 83% of hitters and 75% of pitchers on 2025, and
-landed in the [.75, .85] band on 9 of 10 stat rows.
+ships **Marcel's point projections with the Bayesian model's uncertainty bands** around them —
+with an important caveat, documented after this project's original writeup and covered in §5.
+
+**The coverage claim is narrower than the earlier draft of this memo said.** The 2025 holdout
+posterior-predictive intervals (Tier 2 stage draws + binomial sampling at each player's actual
+PA/IP, computed by `interval_coverage` in the backtest harness) covered 83% of hitters and 75%
+of pitchers on the key stats, landing in [.75, .85] on 9 of 10 stat rows. Those are the
+intervals whose calibration was gated. The bands that `projections.parquet` writes and the
+player page renders are a different object: posterior quantiles of the *derived-stat rate*,
+Marcel-anchored, with no binomial noise on top. Scored against realized 2025 rates on the same
+population, those shipped bands cover 40–75% depending on the stat — narrower than the
+validated ones and centred at a slightly different point. The rate-space bands describe
+posterior uncertainty about a player's true-talent rate; realized single-season outcomes
+carry additional binomial noise the shipped bands do not include. Full re-score:
+`docs/coverage_rescore.md`.
 
 Every change in this memo was run as a pre-registered experiment. Each one had a hypothesis, an
 expected result and an accept/reject rule, and all of that was committed to `docs/fable/` before
@@ -202,6 +214,26 @@ under the pre-registered sensitivity config. The hybrid was the worst model on t
 and learned from ≤ 960 rows.
 
 ## 5. Honest open problems
+
+0. **The shipped bands are not the bands whose calibration was validated.** The h=1 cov80
+   numbers cited in §"The short version" and in the Methodology page came from
+   `interval_coverage` — Tier 2 posterior stage draws plus binomial simulation at each
+   player's actual PA/IP. That is a posterior-*predictive* object. Production writes a
+   different one to `projections.parquet`: posterior quantiles of the derived stat, with
+   the h=1 median re-centred on Marcel by `_anchor_to_marcel`, and no binomial noise. On a
+   pre-registered re-score of the frozen 2021–2025 sidecar, PA-weighted cov80 of the
+   shipped-form bands lands at .63 (H/wOBA) and .58 (P/FIP) across dev targets and .64/.54
+   on 2025 — vs .82/.75 for the posterior-predictive object the memo originally cited. The
+   dominant mechanism is the missing binomial-noise layer (removing it takes coverage down
+   ~.20 by itself); anchoring adds a per-stat shift of a few points either way. 0 of 10
+   role×stat rows land in [.75, .85] on 2025 under the shipped-form re-score. Full working
+   in `docs/coverage_rescore.md`, code in `backend/keystone/eval/coverage_rescore.py`. What
+   the shipped bands honestly describe is posterior uncertainty about a player's *true-talent
+   rate*, not the range of realized season outcomes; both are useful, but only the second was
+   pre-registered as validated, and the two are different objects. No modelling change was
+   made in response — the acceptance rule for this re-score committed the correction to the
+   docs, not to the model. The natural fix (ship posterior-predictive bands by adding
+   `simulate_season` at projected PA) is a product/pipeline decision, filed to STATUS.
 
 1. **The h2–h4 bands are model-implied and have never been backtested.** The backtest scores
    h = 1 only. The small taus on hit_bip (.0105) and xbh (.0198) [`CONTEXT.md` §6] mean the model

@@ -15,13 +15,19 @@ methodology, the negative results, what each research mission changed, and the o
 Dev targets 2021–2024 plus the one-time 2025 holdout; PA′-weighted RMSE
 (`data/artifacts/backtest.json`):
 
-| key stat | Marcel dev mean | Tier 2 dev mean | Tier 2 dev wins | Tier 2 cov80 | 2025 Marcel | 2025 Tier 2 (cov80) |
+| key stat | Marcel dev mean | Tier 2 dev mean | Tier 2 dev wins | Tier 2 cov80 (posterior-predictive) | 2025 Marcel | 2025 Tier 2 (cov80 posterior-predictive) |
 |---|---|---|---|---|---|---|
 | H wOBA | .0334 | .0328 | 2/4 (need 3) | .819 | .0305 | .0309 (.83) |
 | P FIP | .7947 | .8164 | 1/4 (need 3) | .761 | .7317 | .7399 (.75) |
 
 - Both gates fail, so production is **Marcel points + Tier 2 bands** (`production_tier: marcel`).
 - On 2025, Tier 2 won 5 of 8 component rows (BABIP for both roles, P K%, P HR%, H BB%) but lost both aggregates.
+- **The cov80 figures above describe the posterior-predictive intervals validated in the backtest
+  harness (Tier 2 stage draws + binomial season simulation at each player's PA/IP). The bands
+  shown on the player page — `projections.parquet` q10/q90 — are a narrower object (posterior
+  quantiles on the true-talent rate, Marcel-anchored, no binomial noise) and cover realized 2025
+  outcomes at 40–75% depending on the stat. Details and re-score in
+  [`docs/coverage_rescore.md`](docs/coverage_rescore.md).**
 - The playing-time hurdle beat Marcel PT in **8/8** dev targets and ships (`docs/fable/M3_playing_time.md`).
 - **ML challenger:** we red-teamed the Bayesian model with a gradient-boosted challenger on an
   identical information set, plus a Bayesian+GBM hybrid, and compared them on point RMSE and CRPS
@@ -73,6 +79,12 @@ Retaken 2026-09-18 on the shipped build (locked M2 config, M3 playing-time outlo
 
 ## Limitations
 
+- The bands shown on the player page describe posterior uncertainty about a player's
+  true-talent rate; realized single-season outcomes carry additional binomial noise the
+  shipped bands do not include. The .83/.75 coverage figure describes a wider,
+  posterior-predictive interval object that ships in the backtest artifact but not on the
+  player page. Coverage of the on-page bands against realized 2025 rates is 40–75% by stat.
+  See [`docs/coverage_rescore.md`](docs/coverage_rescore.md).
 - Beyond year 1, intervals are model-implied and have not been backtested.
 - Playing time is displayed for year 1 only, deliberately. The PT model is backtested at h1 only,
   and at h2+ it feeds its own simulated healthy seasons back in as recent PT, so injury-depressed
