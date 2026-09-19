@@ -264,3 +264,136 @@ model has not been retuned. See:
 - Whether the intended user semantics of an "80% band" on a projection is "80% of realized
   seasons" (predictive, wider) or "80% of the true-talent posterior" (rate, narrower) is
   also a product decision, not a re-score.
+
+---
+
+## 2026-09-18 — Fix: ship posterior-predictive intervals at h=1 (pre-registration)
+
+Written and committed alone, BEFORE any post-fix coverage number was computed. The result
+below the next "---" is measured on frozen artifacts and reported verbatim, whatever it says.
+
+### What is changing
+
+`projections.parquet` interval quantiles at horizon 1 move from posterior-on-rate to
+posterior-predictive. Concretely, in `backend/keystone/project.py.projections_frame`, after
+the existing `_anchor_to_marcel` step and before `_quantile_frame`, each stage's
+per-player h=1 draws are pushed through the verified `simulate_season` (from
+`backend/keystone/components.py`) at a per-player playing-time value, exactly as
+`eval/backtest.py.interval_coverage` does. Simulated stage counts are then run through the
+same `stats_from_counts` / `derive_hitter` / `derive_pitcher` path the backtest uses to
+score coverage. Nothing is reimplemented: the same code, called from a new call site.
+
+**What does not change.** The fitted model. Priors, sampling, `--obs-noise`/`--env-mode
+shock`, the Marcel anchor at h=1, the point estimate (mean and q50 semantics), and every
+other artifact (`waterfall.parquet`, `aging.parquet`, `history.parquet`, `players.parquet`,
+`league.parquet`, `meta.json`) all stay as they are. Only the shipped q10/q25/q75/q90 at
+h=1 change; the h=1 q50 continues to land on Marcel by construction of the anchor. The
+`mean` column continues to be the posterior-mean rate — a point summary of talent, not of
+a simulated season — so leaderboard sorts and any consumer that uses `mean` behave the
+same way.
+
+### Why this is a correction, not selection
+
+`eval/backtest.py.interval_coverage` builds posterior-predictive intervals: posterior
+draws pushed through `simulate_season` at each player's actual PA'/IP, so binomial
+sampling noise is included. That is the object whose cov80 was .83 (H/wOBA) and .75
+(P/FIP) on 2025 and which the memo quotes. `project.projections_frame` writes quantiles
+from `_quantile_frame` on posterior-on-rate stage draws — a credible interval for latent
+talent, with no binomial layer. The pre-registered re-score
+(§"Coverage re-score under Marcel anchoring") measured the shipped object at cov80 .629
+(H/wOBA) / .584 (P/FIP) against a nominal 80%. That is two correct computations of
+different quantities, one of which is the wrong quantity for a player card.
+
+The player card asks "what will he do next year?". A predictive interval — 80% of
+realized seasons at his projected playing time — answers that. A posterior-on-rate
+interval answers "80% of the plausible values of his true-talent rate", which is a
+different question the UI never poses. So the change is identified by the defect (the
+shipped object does not match the evaluation object it inherits its .83/.75 claim from),
+not chosen by its effect on coverage.
+
+### Two decisions to state up front
+
+**(1) Playing time is itself uncertain.** Options: condition the binomial layer on a
+point PT (Marcel PT, which is what `projections.parquet.pt` at h=1 already shows), or
+integrate over the playing-time posterior from the M3 hurdle (`pt_expected` is a point
+too; the honest version draws PT per posterior draw). Choice: **condition on Marcel PT
+at h=1**, matching the value shown next to the projection on the player page and the
+value the evaluation harness used for Marcel points. Consequence: the binomial variance
+component is `p*(1-p)/n_pa` per stage rather than something larger that adds a
+`Var(1/n_pa)` term; the shipped intervals will be marginally narrower than a
+fully-integrated version. This is the same simplification `interval_coverage` uses (it
+conditions on each player's actual PA), so the shipped object matches the object cov80
+was ever measured on. Integrating over PT would produce a wider band whose calibration
+is not backtested. `pt_expected` is not used here because Marcel PT ships as `pt` and is
+what the summary card renders — using a different PT for the interval than for the
+displayed PT would be a hidden inconsistency.
+
+**(2) Horizons 2–4 have no validated playing time.** M3 §5 and the `AgingOutlook`
+component (`docs/fable/M3_playing_time.md`, `frontend/src/components/AgingOutlook.tsx`)
+already display rates only for h=2..4; PT is shown at h=1 only. If we added a binomial
+layer at h=2..4 we would either be conditioning on an unshown, unvalidated PT (Marcel PT
+extrapolated forward, or `pt_expected` at h=2..4) or on the same h=1 Marcel PT (a lie
+about the player's h=2..4 season). Either way, the band would describe an outcome the UI
+does not show. Choice: **h=2..4 intervals remain posterior-on-rate** — exactly what the
+display promises ("rates only"). Only h=1 becomes predictive. This makes the interval
+semantics consistent with the display decision.
+
+Both decisions are recorded in `STATUS.md` under "Decisions" in the same commit as the
+implementation.
+
+### Prediction (written before the re-run)
+
+The re-score in this document already measured the two objects side-by-side on the same
+2025 holdout: the shipped posterior-on-rate cov80 at .629 (H/wOBA) / .584 (P/FIP) and
+the posterior-predictive cov80 at .831 / .748 on the same rows (rightmost column of the
+2025 table). The 2025 re-score is a legitimate prediction of the post-fix number
+**because the fitted model does not change and the new writer runs the same
+`simulate_season` code path** as `interval_coverage`. Two effects push it slightly off
+that:
+
+- The 2025 posterior-predictive rescore was measured at each player's ACTUAL PA/IP; the
+  shipped object conditions on Marcel PT. Marcel PT overshoots for old/fringe players
+  (per M3), so for those players the interval will be slightly narrower than a
+  played-PT one; for young/breakout players it will be slightly wider. Aggregated,
+  weighted by PA, the effect on cov80 is expected to be within ±.02.
+- The 2025 rescore reused the frozen 2025-target sidecar (window ending 2024, target
+  2025). The next `make project` fits window ending 2026, target 2027 — a new sampler
+  run with different data. Draw-to-draw sampler noise contributes ≤ .005 to cov80 at
+  n=1300 dev rows.
+
+**Predicted post-fix dev 2021–2024 cov80 (PA-weighted mean across targets):**
+
+| role/stat | current (posterior-on-rate) | predicted (predictive) |
+|---|---:|---:|
+| H k_pct  | .713 | .78–.86 |
+| H bb_pct | .659 | .77–.85 |
+| H hr_pct | .596 | .76–.84 |
+| H babip  | .495 | .76–.84 |
+| H **wOBA** | **.629** | **.78–.85** |
+| P k_pct  | .751 | .80–.86 |
+| P bb_pct | .599 | .77–.85 |
+| P hr_pct | .533 | .77–.85 |
+| P babip  | .428 | .75–.83 |
+| P **FIP**  | **.584** | **.72–.79** |
+
+Direction: cov80 increases by .10–.25 on every row. Magnitude: the point estimates come
+from the "posterior-predictive from backtest.json (memo)" column above (the memo's
+.83/.75 dev-mean was measured on the same object we now write), widened by ±.03 to cover
+the two side-effects listed. Point estimates: **H/wOBA .82, P/FIP .75.** If the shipped
+number lands substantially outside the band on either key stat, that itself is
+informative and gets reported as-is.
+
+### The rule
+
+The post-fix re-score runs **once** on dev 2021–2024 after Daniel's next `make project`,
+against the newly written `projections.parquet`. It is reported whatever it says. No
+further change to the model, the anchor, the sampling, the PT conditioning, or the band
+width is made in response to the number. If coverage overshoots (above .85 on either
+key stat) that is reported as over-wide, not corrected by re-tuning. If it undershoots
+(below .75 on either key stat) that is reported as still miscalibrated after the
+correction, not corrected by widening the bands. The correction is identified by the
+defect, not by the re-run.
+
+The 2025 holdout is not re-scored under the new writer — the 2025 posterior-predictive
+number is already reported in the table above (from the frozen sidecar) and matches what
+this fix now ships. Re-scoring 2025 would touch it a fourth time without new information.
