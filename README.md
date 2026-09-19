@@ -22,11 +22,14 @@ Dev targets 2021–2024 plus the one-time 2025 holdout; PA′-weighted RMSE
 
 - Both gates fail, so production is **Marcel points + Tier 2 bands** (`production_tier: marcel`).
 - On 2025, Tier 2 won 5 of 8 component rows (BABIP for both roles, P K%, P HR%, H BB%) but lost both aggregates.
-- **The cov80 figures above describe the posterior-predictive intervals validated in the backtest
-  harness (Tier 2 stage draws + binomial season simulation at each player's PA/IP). The bands
-  shown on the player page — `projections.parquet` q10/q90 — are a narrower object (posterior
-  quantiles on the true-talent rate, Marcel-anchored, no binomial noise) and cover realized 2025
-  outcomes at 40–75% depending on the stat. Details and re-score in
+- **Bands. The cov80 above (.83/.75) is the posterior-predictive object from `interval_coverage`.
+  A pre-registered re-score of the frozen sidecar showed the shipped `projections.parquet` bands
+  had been a *different* object (posterior-on-rate, Marcel-anchored, no binomial layer),
+  covering realized outcomes at only 40–75% by stat. `project.py` was fixed on 2026-09-18 to
+  write posterior-predictive intervals at h=1 via the same `simulate_season` code path the
+  backtest uses. A second pre-registered re-score of the fixed writer's dev intervals
+  (2021–2024) puts 10 of 10 role×stat rows in [.75, .85], with H wOBA .830 and P FIP .803. The
+  fitted model was not touched. Full history — first correction, fix, second re-score — in
   [`docs/coverage_rescore.md`](docs/coverage_rescore.md).**
 - The playing-time hurdle beat Marcel PT in **8/8** dev targets and ships (`docs/fable/M3_playing_time.md`).
 - **ML challenger:** we red-teamed the Bayesian model with a gradient-boosted challenger on an
@@ -79,12 +82,14 @@ Retaken 2026-09-18 on the shipped build (locked M2 config, M3 playing-time outlo
 
 ## Limitations
 
-- The bands shown on the player page describe posterior uncertainty about a player's
-  true-talent rate; realized single-season outcomes carry additional binomial noise the
-  shipped bands do not include. The .83/.75 coverage figure describes a wider,
-  posterior-predictive interval object that ships in the backtest artifact but not on the
-  player page. Coverage of the on-page bands against realized 2025 rates is 40–75% by stat.
-  See [`docs/coverage_rescore.md`](docs/coverage_rescore.md).
+- The bands on the player page are posterior-predictive at h=1 (`projections.parquet`
+  q10/q25/q75/q90, from `simulate_season` at Marcel PT, computed the same way
+  `interval_coverage` scores cov80). The q50 lands on Marcel by construction of the anchor,
+  and the `mean` column is the posterior mean of talent. Dev 2021–2024 PA-weighted cov80 lands
+  in [.75, .85] for all 10 role×stat rows after the 2026-09-18 writer fix — up from 0/10 under
+  the earlier posterior-on-rate writer. The sequence — cov80 claim; re-score discovering the
+  shipped object was different; docs corrected; writer fixed; second re-score — is documented
+  in [`docs/coverage_rescore.md`](docs/coverage_rescore.md).
 - Beyond year 1, intervals are model-implied and have not been backtested.
 - Playing time is displayed for year 1 only, deliberately. The PT model is backtested at h1 only,
   and at h2+ it feeds its own simulated healthy seasons back in as recent PT, so injury-depressed

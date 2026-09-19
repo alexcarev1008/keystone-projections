@@ -398,19 +398,22 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
             locked and committed before any {holdoutTarget ?? 2025} number was computed.
           </p>
           <p className="muted" style={{ fontSize: 12 }}>
-            <strong>Two different band objects, one caveat.</strong> The cov80 figures above
-            describe the intervals scored by <code>interval_coverage</code> in the backtest harness
-            (Tier 2 stage draws + binomial season simulation at each player's actual PA/IP —
-            posterior-predictive of the realized season rate). The bands rendered on the player
-            page come from <code>projections.parquet</code> and are a different object: posterior
-            quantiles of the derived stat, Marcel-anchored, without a binomial-noise layer on top.
-            A pre-registered re-score of the frozen 2021–2025 sidecar (
-            <code>docs/coverage_rescore.md</code>) found the on-page bands cover realized 2025
-            outcomes at 40–75% by stat (0 of 10 rows in [.75, .85] on 2025). What the on-page
-            bands honestly describe is posterior uncertainty about a player's true-talent rate;
-            the wider posterior-predictive object is what carries the .83/.75 calibration claim.
-            The model was not retuned in response — a fix would be to ship the posterior-predictive
-            bands, which is a pipeline decision, not a modelling one.
+            <strong>Bands, and the correction history.</strong> The cov80 figures above describe
+            the intervals scored by <code>interval_coverage</code> in the backtest harness (Tier 2
+            stage draws + binomial season simulation at each player's actual PA/IP —
+            posterior-predictive of the realized season rate). Earlier drafts of this page quoted
+            them alongside language about what the player card shows, but a pre-registered re-score
+            of the frozen sidecar (<code>docs/coverage_rescore.md</code>) established that the
+            bands rendered on the player page had been a different object — posterior-on-rate,
+            Marcel-anchored, no binomial layer — with cov80 40–75% by stat on realized 2025
+            outcomes (0 of 10 rows in [.75, .85] on 2025). That was corrected in the docs first.
+            The pipeline fix landed 2026-09-18: <code>project.py</code> at h=1 now applies{' '}
+            <code>simulate_season</code> to the anchored stage draws at Marcel PT, the same code
+            path <code>interval_coverage</code> uses. The fitted model was not touched. A second
+            pre-registered re-score (dev 2021–2024) puts 10 of 10 role×stat rows in [.75, .85],
+            with H wOBA .830 and P FIP .803. The on-page bands now describe the same object the
+            .83/.75 claim was ever measured on. h2–h4 remain rate-space intervals to match the
+            "rates only" display for horizons without validated playing time.
           </p>
           {holdoutTarget !== null && (holdoutRows.length === 0 ? (
             <p>Holdout target: {holdoutTarget}. Unspent — reserved for after model iteration.</p>
@@ -421,11 +424,11 @@ y[i, t]         ~ Binomial(n[i, t], invlogit(mu_league[t] + theta[i, t] + X_park
               <p style={{ marginTop: 12 }}>
                 On the untouched {holdoutTarget} season, Tier 2 scored slightly <em>below</em> Marcel on
                 both key stats (wOBA and FIP RMSE), while its 80% posterior-predictive intervals stayed
-                in band. One season can't settle the points question either way. And the calibration
-                claim is narrower than earlier drafts of this page said: it is the
-                posterior-predictive interval object (the one scored by <code>interval_coverage</code>)
-                that lands in band. The bands rendered above on the player page are a different
-                object; see the note earlier in this section and{' '}
+                in band. One season can't settle the points question either way. And the same
+                interval object the .83/.75 cov80 describes — <code>interval_coverage</code>'s
+                posterior-predictive — is now the object the player page renders after the
+                2026-09-18 writer fix. Earlier drafts of this page quoted the .83/.75 alongside a
+                different, narrower on-page object; that mismatch is documented in{' '}
                 <code>docs/coverage_rescore.md</code>.
               </p>
             </div>

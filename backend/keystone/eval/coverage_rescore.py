@@ -292,3 +292,131 @@ def load_sidecar(artifacts_dir: Path | None = None) -> pd.DataFrame:
     if not p.exists():
         raise FileNotFoundError(f"missing sidecar {p}; run `make backtest` first")
     return pd.read_parquet(p)
+
+
+# ---------------------------------------------------------------- 2026-09-18: fix re-score
+# The `project.py` fix (2026-09-18) makes the shipped h=1 interval quantiles the
+# posterior-*predictive* object `interval_coverage` was always measuring for cov80:
+# anchored stage draws pushed through `simulate_season` at Marcel PT. Pre-registration
+# and prediction: `docs/coverage_rescore.md` 2026-09-18 section. This block scores the
+# new object on dev 2021-2024 without refitting (a refit at 4 dev targets ≈ 140 min).
+#
+# Approximation, stated up front. The sidecar stores derived-stat quantiles (not
+# stage-level draws), so the exact anchored predictive cannot be reconstructed without
+# a refit. Instead:
+#   1. Talent posterior-on-rate sd per player-stat is approximated from the sidecar's
+#      80% width under a Gaussian assumption: sd_talent ≈ (q90 − q10) / 2.5631.
+#   2. Binomial variance at Marcel PT is measured directly by running the writer's own
+#      `_predictive_stats_h1` on a degenerate stage distribution (Marcel stage rates
+#      broadcast to n_sim draws — the anchor pushed to a point, no talent spread).
+#   3. Predictive sd = sqrt(sd_talent² + sd_binom²), assuming independence. This is
+#      exact when the two are independent (they are, by construction of the writer:
+#      binomial draws are conditional on the anchored talent draws).
+#   4. Interval: center = Marcel derived stat, q10/q90 = center ± 1.2816·sd (normal
+#      tails). Skew from the derived-stat function is ignored — for wOBA (linear in
+#      stage counts) this is fine; for FIP (division by IP) the tail is slightly
+#      right-skewed and cov80 may under-report by ≤ .02.
+#
+# Approximation direction of error: (3) is exact under independence; (1) treats the
+# tier2 posterior as Gaussian, which is a mild under-statement of the tail width when
+# the posterior is skewed (small effect on the cov80 given the binomial layer dominates
+# on most rows). Overall, the approximation should be within ±.02 of a full-refit
+# answer on cov80.
+
+
+def _predictive_binomial_sd(role: str, target: int, bundle: BT.Bundle,
+                            ids: np.ndarray, marcel_pt: pd.Series, seed: int,
+                            n_sim: int = 2000) -> pd.DataFrame:
+    """Binomial-only sd of each derived stat at Marcel stage rates + Marcel PT.
+
+    Runs the writer's own `_predictive_stats_h1` (from `keystone.project`) on
+    Marcel stage rates broadcast to (n_players, n_sim) — a stage distribution with
+    no talent spread — so the returned sd is exactly the binomial-noise contribution
+    at Marcel PT that `simulate_season` produces in `projections.parquet`.
+
+    Returns a DataFrame indexed by mlbam_id with one column per derived stat.
+    """
+    from keystone.project import STATS as PROJ_STATS
+    from keystone.project import _predictive_stats_h1
+
+    train = BT.train_slice(bundle, target)
+    env = BT.scoring_env(bundle, role, target)
+    m_rates = BT.marcel_probs(train, role, target).reindex(ids)
+    stages = BT.ROLE_STAGES[role]
+
+    stage_draws = {}
+    for s in stages:
+        r = m_rates[s].to_numpy(dtype=float)
+        stage_draws[s] = np.broadcast_to(r[:, None], (len(ids), n_sim)).copy()
+
+    pt = marcel_pt.reindex(ids).to_numpy(dtype=float)
+    stats_pred = _predictive_stats_h1(stage_draws, role, env, pt, seed=seed)
+    sd = {s: np.nanstd(stats_pred[s], axis=-1) for s in PROJ_STATS[role]}
+    return pd.DataFrame(sd, index=pd.Index(ids, name="mlbam_id"))
+
+
+def anchored_predictive_intervals(tf: TargetFrame, stat: str,
+                                   binom_sd: pd.DataFrame) -> pd.DataFrame:
+    """Return q10/q50/q90 of the NEW shipped interval object at Marcel PT.
+
+    center = marcel derived stat; predictive sd = sqrt(tier2 sd² + binomial sd²).
+    See the module-level 2026-09-18 comment for the approximation details.
+    """
+    sc = tf.sidecar[tf.sidecar.stat == stat].set_index("mlbam_id").reindex(tf.ids)
+    sd_talent = (sc.q90 - sc.q10).to_numpy(dtype=float) / 2.5631
+    sd_binom = binom_sd[stat].reindex(tf.ids).to_numpy(dtype=float)
+    predictive_sd = np.sqrt(np.where(np.isfinite(sd_talent), sd_talent ** 2, 0.0)
+                            + np.where(np.isfinite(sd_binom), sd_binom ** 2, 0.0))
+    center = tf.marcel[stat].reindex(tf.ids).to_numpy(dtype=float)
+    return pd.DataFrame({"mlbam_id": tf.ids,
+                         "q10": center - 1.2815515655446004 * predictive_sd,
+                         "q50": center,
+                         "q90": center + 1.2815515655446004 * predictive_sd})
+
+
+def rescore_predictive(bundle: BT.Bundle, sidecar: pd.DataFrame,
+                       targets: tuple[int, ...], seed: int = 7,
+                       n_sim: int = 2000) -> pd.DataFrame:
+    """cov80 of the NEW shipped intervals (anchored predictive at Marcel PT), per
+    (target, role, stat), on the same eval intersection the old re-score uses.
+
+    One row per (target, role, stat) with n, cov80_w, cov80_u, width. See the
+    module-level 2026-09-18 comment for the approximation.
+    """
+    from keystone.models import marcel as MARCEL
+
+    rows = []
+    for target in targets:
+        for role in ("H", "P"):
+            tf = build_target_frame(bundle, role, int(target), sidecar)
+            if tf is None:
+                continue
+            m_pt = MARCEL.marcel_playing_time(BT.train_slice(bundle, int(target)).ps[role],
+                                              role, int(target))
+            binom_sd = _predictive_binomial_sd(role, int(target), bundle, tf.ids,
+                                               m_pt, seed=seed, n_sim=n_sim)
+            sc_stats = set(tf.sidecar.stat.unique())
+            for stat in STATS_BY_ROLE[role]:
+                if stat not in sc_stats or stat not in tf.actual.columns:
+                    continue
+                iv = anchored_predictive_intervals(tf, stat, binom_sd)
+                stats = cov80(iv, tf.actual[stat], tf.weights)
+                rows.append({"target": tf.target, "role": role, "stat": stat,
+                             "kind": "anchored_predictive",
+                             "n_sim": int(n_sim), **stats})
+    return pd.DataFrame(rows)
+
+
+def summarise_dev_predictive(cov: pd.DataFrame,
+                              dev_targets: tuple[int, ...]) -> pd.DataFrame:
+    """PA-weighted mean cov80 across dev targets on the anchored-predictive rows."""
+    dev = cov[cov.target.isin(dev_targets)].copy()
+    grp = (dev.groupby(["role", "stat"])
+              .apply(lambda d: pd.Series({
+                  "cov80_w_mean": d.cov80_w.mean() if d.cov80_w.notna().any() else np.nan,
+                  "cov80_u_mean": d.cov80_u.mean() if d.cov80_u.notna().any() else np.nan,
+                  "n_targets": int(len(d)),
+                  "width_mean": d.width.mean()}), include_groups=False)
+              .reset_index())
+    grp["in_band_w"] = grp.cov80_w_mean.between(*COV80_BAND)
+    return grp

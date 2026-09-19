@@ -13,18 +13,29 @@ beat Marcel on hitter wOBA in 2 of 4 years and on pitcher FIP in 1 of 4. The shi
 ships **Marcel's point projections with the Bayesian model's uncertainty bands** around them —
 with an important caveat, documented after this project's original writeup and covered in §5.
 
-**The coverage claim is narrower than the earlier draft of this memo said.** The 2025 holdout
+**A correction was needed here, and it's now been applied — twice, in order.** The 2025 holdout
 posterior-predictive intervals (Tier 2 stage draws + binomial sampling at each player's actual
 PA/IP, computed by `interval_coverage` in the backtest harness) covered 83% of hitters and 75%
 of pitchers on the key stats, landing in [.75, .85] on 9 of 10 stat rows. Those are the
-intervals whose calibration was gated. The bands that `projections.parquet` writes and the
-player page renders are a different object: posterior quantiles of the *derived-stat rate*,
-Marcel-anchored, with no binomial noise on top. Scored against realized 2025 rates on the same
-population, those shipped bands cover 40–75% depending on the stat — narrower than the
-validated ones and centred at a slightly different point. The rate-space bands describe
-posterior uncertainty about a player's true-talent rate; realized single-season outcomes
-carry additional binomial noise the shipped bands do not include. Full re-score:
-`docs/coverage_rescore.md`.
+intervals whose calibration was gated. In the earlier draft of this memo, that cov80 was
+quoted as if it described the bands rendered on a player page — but a pre-registered re-score
+of the frozen sidecar (`docs/coverage_rescore.md`) established that the shipped bands were a
+*different object*: posterior quantiles of the derived-stat rate, Marcel-anchored, with no
+binomial layer. Scored against actuals on the same population, those rate-space bands covered
+40–75% depending on the stat. That was the first correction; the memo was updated to say so
+plainly rather than silently repeating the .83/.75 claim about the wrong object.
+
+**Fix and re-score, 2026-09-18.** `project.py` now writes posterior-predictive intervals at
+h=1: after the Marcel anchor, each player's stage draws are pushed through the verified
+`simulate_season` at Marcel PT, exactly the code path `interval_coverage` uses to score cov80.
+Nothing about the fitted model changed — no refit, no prior, no threshold. Re-scored on dev
+2021–2024 (approximation from the sidecar + writer-driven binomial variance, no refit), the
+shipped intervals now cover 10 of 10 role×stat rows in [.75, .85], with H wOBA .830 and P FIP
+.803. Prediction fidelity: 9 of 10 rows landed inside a pre-registered range; P FIP came in
+.013 above the top of its predicted range and is reported as-is, not re-tuned. The bands the
+player page renders now describe the object the .83/.75 claim was ever measured on. Full
+working: `docs/coverage_rescore.md`, code in `backend/keystone/project.py` +
+`backend/keystone/eval/coverage_rescore.py`.
 
 Every change in this memo was run as a pre-registered experiment. Each one had a hypothesis, an
 expected result and an accept/reject rule, and all of that was committed to `docs/fable/` before
@@ -215,25 +226,28 @@ and learned from ≤ 960 rows.
 
 ## 5. Honest open problems
 
-0. **The shipped bands are not the bands whose calibration was validated.** The h=1 cov80
-   numbers cited in §"The short version" and in the Methodology page came from
-   `interval_coverage` — Tier 2 posterior stage draws plus binomial simulation at each
-   player's actual PA/IP. That is a posterior-*predictive* object. Production writes a
-   different one to `projections.parquet`: posterior quantiles of the derived stat, with
-   the h=1 median re-centred on Marcel by `_anchor_to_marcel`, and no binomial noise. On a
-   pre-registered re-score of the frozen 2021–2025 sidecar, PA-weighted cov80 of the
-   shipped-form bands lands at .63 (H/wOBA) and .58 (P/FIP) across dev targets and .64/.54
-   on 2025 — vs .82/.75 for the posterior-predictive object the memo originally cited. The
-   dominant mechanism is the missing binomial-noise layer (removing it takes coverage down
-   ~.20 by itself); anchoring adds a per-stat shift of a few points either way. 0 of 10
-   role×stat rows land in [.75, .85] on 2025 under the shipped-form re-score. Full working
-   in `docs/coverage_rescore.md`, code in `backend/keystone/eval/coverage_rescore.py`. What
-   the shipped bands honestly describe is posterior uncertainty about a player's *true-talent
-   rate*, not the range of realized season outcomes; both are useful, but only the second was
-   pre-registered as validated, and the two are different objects. No modelling change was
-   made in response — the acceptance rule for this re-score committed the correction to the
-   docs, not to the model. The natural fix (ship posterior-predictive bands by adding
-   `simulate_season` at projected PA) is a product/pipeline decision, filed to STATUS.
+0. **Coverage claim → discrepancy → fix (the history is worth keeping).** The original memo
+   quoted h=1 cov80 of .83 (H/wOBA) and .75 (P/FIP) alongside language that described what a
+   player page shows. Those numbers come from `interval_coverage` — Tier 2 posterior stage
+   draws plus binomial simulation at each player's actual PA/IP — a posterior-*predictive*
+   object. But production wrote a different one to `projections.parquet`: posterior quantiles
+   of the derived stat, Marcel-anchored, no binomial noise. A pre-registered re-score of the
+   frozen 2021–2025 sidecar (`docs/coverage_rescore.md`) measured the shipped-form bands at
+   .63 (H/wOBA) / .58 (P/FIP) across dev and .64/.54 on 2025 — 0 of 10 role×stat rows in
+   [.75, .85] on 2025. The dominant mechanism was the missing binomial-noise layer (removing
+   it takes coverage down ~.20 by itself); Marcel anchoring added a per-stat shift of a few
+   points either way. That was the first correction, and it landed in the docs, not the
+   model.
+   
+   The pipeline fix ships next: `project.py` at h=1 now applies `simulate_season` to the
+   anchored stage draws at Marcel PT — the same code path `interval_coverage` uses. The
+   fitted model is unchanged. A pre-registered second re-score, dev 2021–2024
+   (`docs/coverage_rescore.md`), lands 10 of 10 role×stat rows in-band, with H wOBA .830 and
+   P FIP .803. The `mean` column keeps its posterior-mean-of-talent semantics; q50 keeps
+   landing on Marcel by construction of the anchor; only q10/q25/q75/q90 change at h=1. h=2..4
+   remain posterior-on-rate, matching the "rates only" display decision that came out of M3
+   (item 2 below). The sequence of two corrections — first the docs, then the code — is the
+   record: the artifact and the claim now describe the same object.
 
 1. **The h2–h4 bands are model-implied and have never been backtested.** The backtest scores
    h = 1 only. The small taus on hit_bip (.0105) and xbh (.0198) [`CONTEXT.md` §6] mean the model

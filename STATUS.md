@@ -45,6 +45,31 @@
   of a few points (median |shift|/width ≈ .13–.22, 99th pctile .57–.91). Per the pre-registered
   commitment the memo, README and Methodology were corrected in the same commit — no model
   changes. Two follow-on questions filed below.
+- [x] Shipped intervals → posterior-predictive fix — Opus, 2026-09-18. Pre-registration committed
+  alone (`e9859e6`), with a written prediction (H/wOBA .78–.85, P/FIP .72–.79, points .82/.75)
+  before any post-fix number was computed. Implementation (`9e3dc66`): at h=1
+  `project.py.projections_frame` now applies the verified `simulate_season` to the anchored
+  stage draws at Marcel PT, then routes them through the same
+  `derive_hitter`/`derive_pitcher` path `eval/backtest.py.interval_coverage` uses to score
+  cov80. Mean and q50 keep their posterior-on-rate semantics (q50 lands on Marcel by the
+  anchor); h=2..4 stay posterior-on-rate to match the "rates only" display. No refit, no
+  config change, no threshold moved. Two decisions recorded (see Decisions): conditioned on
+  Marcel PT rather than integrating the PT posterior (matches the shown `pt` column and the
+  `interval_coverage` convention); h=2..4 unchanged. New test `test_predictive_intervals.py`
+  (predictive > rate widths at 500 PA; converges to rate widths as PA→∞). **Re-score result**
+  (dev 2021–2024, PA/IP-weighted mean cov80, via
+  `keystone.eval.coverage_rescore.rescore_predictive` — approximation from sidecar +
+  writer-driven binomial variance, no refit): **10 of 10 role×stat rows in [.75, .85]**
+  (H k .826, H bb .814, H hr .814, H babip .804, **H wOBA .830**; P k .844, P bb .815,
+  P hr .832, P babip .812, **P FIP .803**). 9 of 10 rows landed inside the pre-registered
+  prediction range; P FIP overshot by .013, reported as over-wide, not corrected by
+  re-tuning. `docs/coverage_rescore.md` carries the pre-registration, the run-once
+  commitment and the results verbatim. Memo/README/Methodology corrected in the same commit
+  as this entry, keeping the earlier verdict-(c) correction visible. Model unchanged; the
+  shipped bands now describe the same object cov80 was ever measured on.
+  **← Handoff to Daniel:** run `make project` (~35 min) once to regenerate
+  `data/artifacts/projections.parquet` with the new h=1 quantiles. Nothing else changes on
+  disk (rates-only h=2..4, unchanged waterfall/aging/history/players/league/meta).
 
 ## Stage C — Opus final polish
 - [ ] Handoff queue empty · `make test` + `npm run build` pass · re-run after the 2026 season ends
@@ -62,6 +87,13 @@
 | interview prep | $15 | Daniel fills in (Fable self-estimate ~$6: input ~230k, output ~18k) | ~$41 |
 
 ## Next command(s) for Daniel
+- **← NEXT (Daniel): `make project`** (~35 min). Rewrites
+  `data/artifacts/projections.parquet` with h=1 posterior-predictive quantiles
+  (`simulate_season` at Marcel PT), matching the object `interval_coverage` scores for
+  cov80. Mean and q50 keep their posterior-on-rate semantics; h=2..4 unchanged. No refit
+  authorised, no gate flip expected. After it finishes, spot-check any hitter's fan chart
+  — the h=1 80% range will be roughly √(rate_var² + binomial_var²) wider than before
+  (e.g. wOBA q90−q10 ≈ .09 vs the pre-fix ≈ .06). Nothing else needs to run.
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
   Daniel's `make holdout` raced the `handoff: M2c` commit (14:54) by one minute and ran the
   pre-wiring code: no flags, no guard → it scored 2025 with the OLD config (`mean3`,
@@ -772,6 +804,8 @@ Real modeling findings this run surfaces (write in the Methodology page):
 - Holdout 2025: **unspent**, authorised once now (see Next commands).
 
 ## Decisions (one line each: date — decision — why)
+- 2026-09-18 — Shipped intervals fix (Opus): at h=1, `project.py` conditions the binomial layer on Marcel PT (matches the value shown in `pt` and the `interval_coverage` convention) rather than integrating the M3 PT posterior; adding PT-posterior variance would inflate widths in a way no backtest measures. h=2..4 stay posterior-on-rate — the "rates only" display for horizons without validated PT is deliberate, so the interval object matches what the UI shows.
+- 2026-09-18 — Coverage rescore approximation (Opus): `keystone.eval.coverage_rescore.rescore_predictive` builds the new shipped interval as `sd² = tier2_sd² + binomial_sd_at_marcel_pt²`, with tier2 sd from sidecar (Gaussian approx on 80% width) and binomial sd measured by running the writer's own `_predictive_stats_h1` on Marcel stage rates broadcast to 2000 draws — a degenerate anchored distribution. The independence assumption is exact under the writer; the Gaussian approximation on the tier2 posterior is a mild under-statement of the tail. A full refit at four window ends (~140 min) was declined by the pre-registered task.
 - 2026-09-18 — M3 wiring (Opus): the outlook's "if he plays" PT is pt_expected / p_play from the same simulation, so the expected line = p_play × conditional exactly. Counts = posterior-mean rate × PT. Pitchers show IP only, because K counts would need a per-player BF/IP conversion the artifacts don't carry. `pt-backtest` refuses targets ≥ 2025.
 - 2026-09-17 — Fable budget re-split: cut the research-memo and hiring-manager-review missions (writing and judgement Daniel/Opus can do), moved the $30 into model research (M2 now 3 sessions, $55), playing time ($20) and a new ML-challenger mission ($10) — Fable is reserved for modelling and statistics only.
 - 2026-09-17 — Reference model verified on simulated data (0 divergences, 80% coverage 0.83) — MANUAL §5.3

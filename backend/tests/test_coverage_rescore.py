@@ -124,3 +124,24 @@ def _make_tf(marcel_stat: float, q10: float, q50: float, q90: float) -> CR.Targe
     return CR.TargetFrame(target=2024, role="H", ids=ids,
                           weights=np.array([500.0, 500.0, 500.0]),
                           sidecar=sc, marcel=marcel, actual=actual)
+
+
+# ---------------------------------------------------------------- 2026-09-18 predictive extension
+
+def test_anchored_predictive_intervals_center_on_marcel_and_widen_with_binomial():
+    """Predictive interval: q50 = marcel; width² = sidecar width² + binomial width².
+    A row with binomial_sd = 0 recovers the sidecar-only interval; a positive binomial_sd
+    widens it around the same Marcel center."""
+    tf = _make_tf(marcel_stat=0.320, q10=0.300, q50=0.310, q90=0.330)   # sidecar sd ≈ .0117
+    binom_sd = pd.DataFrame({"woba": [0.0, 0.020, 0.020]},
+                            index=pd.Index(tf.ids, name="mlbam_id"))
+    iv = CR.anchored_predictive_intervals(tf, "woba", binom_sd)
+    # q50 lands on Marcel for every player.
+    assert np.allclose(iv.q50, 0.320)
+    # binomial_sd = 0 -> width equals sidecar width (Gaussian normal).
+    sidecar_sd = (0.330 - 0.300) / 2.5631
+    q_norm = 1.2815515655446004
+    assert np.isclose(iv.q90.iloc[0] - iv.q10.iloc[0], 2 * q_norm * sidecar_sd, atol=1e-6)
+    # binomial_sd = .020 widens: combined sd = sqrt(sidecar_sd² + .020²)
+    combined = np.sqrt(sidecar_sd ** 2 + 0.020 ** 2)
+    assert np.isclose(iv.q90.iloc[1] - iv.q10.iloc[1], 2 * q_norm * combined, atol=1e-6)

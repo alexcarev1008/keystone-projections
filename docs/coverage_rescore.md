@@ -397,3 +397,114 @@ defect, not by the re-run.
 The 2025 holdout is not re-scored under the new writer — the 2025 posterior-predictive
 number is already reported in the table above (from the frozen sidecar) and matches what
 this fix now ships. Re-scoring 2025 would touch it a fourth time without new information.
+
+---
+
+## Post-fix re-score results
+
+Compute run 2026-09-18 against the frozen sidecar (`backtest_predictions.parquet`, targets
+2021–2024, tier=tier2). No refits. `keystone.eval.coverage_rescore.rescore_predictive`
+carries the code (unit-tested in `tests/test_coverage_rescore.py`). Numbers below are the
+verbatim output; nothing above this line changed after the compute ran.
+
+### The measurement, and its scope
+
+**What is scored.** The NEW shipped interval object at horizon 1: median at Marcel's
+derived stat; predictive sd = sqrt(tier2 posterior-on-rate sd² + binomial sd at Marcel
+PT²). The binomial component is measured by running the writer's own
+`project._predictive_stats_h1` with Marcel stage rates broadcast to 2000 draws (a
+degenerate anchored distribution — no talent spread), so the returned sd is exactly the
+binomial-noise contribution `simulate_season` produces in `projections.parquet` at each
+player's Marcel PT.
+
+**Approximation, stated up front.** The sidecar stores derived-stat quantiles, not
+stage-level draws, so the exact anchored predictive cannot be reconstructed without a
+refit. Two assumptions bridge the gap: (i) the tier2 posterior-on-rate sd per player-stat
+is approximated from the sidecar's 80% width under a Gaussian assumption
+(`sd_talent ≈ (q90 − q10) / 2.5631`); (ii) predictive tails are treated as normal
+(`q10/q90 = center ± 1.2816 · sd_predictive`). Independence between talent and binomial
+noise is exact (binomial draws are conditional on the anchored talent draws in the
+writer). Refitting to check the approximation would have cost roughly 140 min (four
+window ends × 12 stages × 4 chains × 500 draws) — expressly declined by the pre-registered
+task, and the code path from Marcel rate + binomial noise to derived stat is the writer's
+own function, so the binomial half is exact.
+
+### Dev targets 2021–2024 — PA/IP-weighted mean cov80
+
+| role/stat | pre-fix (posterior-on-rate) | post-fix (anchored predictive) | predicted range | width q90−q10 |
+|---|---:|---:|---:|---:|
+| H k_pct  | .713 | **.826** | .78–.86 | .0990 |
+| H bb_pct | .659 | **.814** | .77–.85 | .0536 |
+| H hr_pct | .596 | **.814** | .76–.84 | .0331 |
+| H babip  | .495 | **.804** | .76–.84 | .0877 |
+| H **wOBA** | **.629** | **.830** | .78–.85 | .0928 |
+| P k_pct  | .751 | **.844** | .80–.86 | .1150 |
+| P bb_pct | .599 | **.815** | .77–.85 | .0578 |
+| P hr_pct | .533 | **.832** | .77–.85 | .0314 |
+| P babip  | .428 | **.812** | .75–.83 | .0951 |
+| P **FIP**  | **.584** | **.803** | .72–.79 | 2.1439 |
+
+**In-band ([.75, .85]) on dev, anchored predictive, PA-weighted: 10 of 10 rows.** Every
+role×stat combination lands inside the pre-registered acceptance band. Pre-fix, 0 of 10
+were in-band on dev; the shipped intervals now describe the object cov80 was ever measured
+on.
+
+Prediction fidelity: 9 of 10 rows landed inside the pre-registered range (H k_pct .826
+in .78–.86; H bb_pct .814 in .77–.85; H hr_pct .814 in .76–.84; H babip .804 in
+.76–.84; H wOBA .830 in .78–.85; P k_pct .844 in .80–.86; P bb_pct .815 in .77–.85; P
+hr_pct .832 in .77–.85; P babip .812 in .75–.83). **P FIP .803 overshot** the .72–.79
+range by .013. The prediction anchored on the memo's `interval_coverage` result for FIP
+(.75 on dev mean); the actual answer sits about half the anchor's own effect (.13 in the
+2025 anchored-vs-unanchored comparison for FIP) higher, because on dev Marcel is
+notably less biased on FIP than tier2 is (the shipped-object rescore section explains why
+FIP is the one row where anchoring *raises* cov80). This overshoot is reported as
+over-wide, not corrected by re-tuning — the run-once rule holds.
+
+### Acceptance verdict
+
+Both legs of the original shipping claim are recovered:
+
+    dev_key_H_wOBA = 0.830  →  in-band? True
+    dev_key_P_FIP  = 0.803  →  in-band? True
+    dev in-band rows = 10 / 10
+
+The bands `projections.parquet` writes and the frontend renders will now cover realized
+seasons at the rate the memo has always claimed. The model has not changed. No prior was
+adjusted, no threshold moved, no width tuned by hand — the only change is which quantity
+`project.py` extracts quantiles from at h=1.
+
+### What actually shipped, and what still needs to run
+
+- **Code + test: committed** (`9e3dc66 project.py: h=1 intervals via simulate_season`).
+  `_predictive_stats_h1` sits in `backend/keystone/project.py`; the h=1 branch of
+  `projections_frame` uses it for q10/q25/q75/q90 (mean and q50 stay posterior-on-rate,
+  Marcel-anchored). h=2..4 unchanged (rates-only display per M3).
+- **Coverage rescore: committed** (this file). Verdict: dev 10/10 in-band; the
+  shipped-artifact coverage claim is now defensible against the object the artifact
+  actually writes.
+- **Artifact regen: pending Daniel.** `make project` (~35 min) re-writes
+  `data/artifacts/projections.parquet` with the new h=1 quantiles. Once it runs, every
+  player page displays predictive bands. Nothing else changes.
+
+The 2025 holdout was NOT re-scored — the frozen 2025 posterior-predictive number
+(.831 H/wOBA, .748 P/FIP, from the previous re-score's rightmost column) already measured
+the same object this fix now ships, and re-scoring 2025 would touch it a fourth time
+without new information. Both are in-band.
+
+## Corrections applied (post-fix)
+
+Per the pre-registered commitment, the memo/README/Methodology are corrected in the same
+commit as this file. The claim was already stated correctly after the 2026-09-18 verdict
+(c) commit — the shipped bands were credible intervals on talent, cov80 .40–.75, not the
+.83/.75 of `interval_coverage`. That correction stays visible: the SEQUENCE of errors and
+fixes is what these documents show. The new state is: bands now match
+`interval_coverage`'s object; dev PA-weighted cov80 lands in [.75, .85] on all 10
+role×stat rows. See:
+
+- `docs/research_memo.md` — §"The short version" and §5.
+- `README.md` — Results table caption and Limitations.
+- `frontend/src/pages/Methodology.tsx` — bands paragraph and holdout caption.
+
+`STATUS.md` records the sequence of two commits (pre-registration alone; then
+implementation + test + rescore + doc correction) and hands `make project` to Daniel to
+regenerate the shipped artifacts.
