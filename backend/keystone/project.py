@@ -27,7 +27,8 @@ from keystone import config as C
 from keystone import league as LG
 from keystone.components import (HITTER_STAGES, PARK_STAGES, PITCHER_STAGES,
                                  derive_hitter, derive_pitcher, pa_prime,
-                                 per_pa_from_stage_rates, stage_counts)
+                                 per_pa_from_stage_rates, simulate_season,
+                                 stage_counts)
 from keystone.data import statcast as SC
 from keystone.eval.backtest import Bundle, load_bundle, park_exposure_map
 from keystone.models import marcel as MARCEL
@@ -309,10 +310,87 @@ def _quantile_frame(vals: np.ndarray) -> dict:
             "q75": q[3], "q90": q[4]}
 
 
+def _predictive_stats_h1(per_stage_h1: dict[str, np.ndarray], role: str, env: dict,
+                          m_pt: np.ndarray, seed: int) -> dict[str, np.ndarray]:
+    """h=1 posterior-predictive stats: `simulate_season` on the (already anchored) stage
+    draws at each player's Marcel-projected playing time, then derive stats from the
+    simulated counts. Same code path `eval/backtest.py.interval_coverage` uses to compute
+    cov80, so the shipped intervals now describe the object the .83/.75 cov80 claim was
+    always measured on (`docs/coverage_rescore.md`).
+
+    Playing time is conditioned on Marcel PT — the value shown next to the projection and
+    the same convention `interval_coverage` uses (which conditions on actual PA'/BF'). For
+    pitchers, `m_pt` is IP; BF is derived from posterior-mean `ip_per_bf` so the binomial
+    layer has an n consistent with the same fitted stage rates. Returns
+    {stat: (n_players, n_draws) predictive draws} on the full `STATS[role]` set.
+    """
+    stages = list(per_stage_h1.keys())
+    n_players = len(m_pt)
+    n_draws = per_stage_h1[stages[0]].shape[1]
+    rng = np.random.default_rng(seed)
+
+    ip_by_player = None
+    if role == "P":
+        # BF per player = IP / posterior-mean ip_per_bf (from the same fitted rates). Keeps
+        # the binomial n consistent with the model that produced the draws.
+        mean_p = {s: per_stage_h1[s].mean(axis=-1) for s in stages}
+        r_mean = per_pa_from_stage_rates(mean_p)
+        hits_per_pa = r_mean["hr"] + r_mean["h_bip"]
+        outs_per_bf = env["kappa"] * (1.0 - r_mean["bb"] - r_mean["hbp"] - hits_per_pa)
+        ip_per_bf = np.clip(outs_per_bf / 3.0, 1e-3, None)
+        n_pa_by_player = np.maximum(np.round(np.asarray(m_pt, dtype=float) / ip_per_bf), 1).astype(int)
+        ip_by_player = np.asarray(m_pt, dtype=float)
+    else:
+        n_pa_by_player = np.maximum(np.round(np.asarray(m_pt, dtype=float)), 1).astype(int)
+
+    stat_names = STATS[role]
+    out = {s: np.full((n_players, n_draws), np.nan, dtype=np.float64) for s in stat_names}
+    for i in range(n_players):
+        p_i = {s: np.asarray(per_stage_h1[s][i], dtype=np.float64) for s in stages}
+        # Skip Marcel-anchor NaN players (projections_frame drops them upstream, but
+        # partial/no-anchor modes may pass finite draws for every player: check explicitly).
+        if any((not np.isfinite(v).all()) for v in p_i.values()):
+            continue
+        if not np.isfinite(n_pa_by_player[i]) or n_pa_by_player[i] <= 0:
+            continue
+        counts = simulate_season(p_i, int(n_pa_by_player[i]), rng)
+        pa = counts["pa"]
+        rr = {"k": counts["k"] / pa, "ubb": counts["bb"] / pa,
+              "hbp": counts["hbp"] / pa, "hr": counts["hr"] / pa}
+        if role == "H":
+            rr.update({e: counts[e] / pa for e in ("single", "double", "triple")})
+        else:
+            rr["h_bip"] = counts["h_bip"] / pa
+        with np.errstate(divide="ignore", invalid="ignore"):
+            p_sim = MARCEL.to_stage_probs(rr)
+            # For pitchers, pass n_pa (=BF) and IP so `derived_stats`' FIP override lands
+            # on the correct scale (events * BF / IP + c_fip), matching backtest.py's
+            # `_fip_on_actual_ip`. Hitters need neither.
+            if role == "P":
+                stats_i = derived_stats(p_sim, role, env,
+                                        pa=pa, ip=float(ip_by_player[i]))
+            else:
+                stats_i = derived_stats(p_sim, role, env, pa=None, ip=None)
+        for s in stat_names:
+            arr = np.asarray(stats_i[s], dtype=np.float64)
+            if arr.size == n_draws:
+                out[s][i, :] = arr
+    return out
+
+
 def projections_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dict,
                        horizons: int, env: dict, prod_tier: dict,
-                       projection_season: int, marcel_pt: dict) -> pd.DataFrame:
-    """One row per (mlbam_id, role, horizon, stat) with mean/q10..q90/tier/pt."""
+                       projection_season: int, marcel_pt: dict, seed: int = 1) -> pd.DataFrame:
+    """One row per (mlbam_id, role, horizon, stat) with mean/q10..q90/tier/pt.
+
+    At h=1 the interval quantiles (q10/q25/q75/q90) are posterior-*predictive*: the
+    anchored stage draws pushed through `simulate_season` at Marcel PT, matching the
+    object `eval/backtest.py.interval_coverage` scores for cov80. The point summary
+    (mean and q50) stays on the posterior-on-rate scale, so q50 continues to land on
+    Marcel's derived stat by construction of the anchor. At h=2..4 (rates-only display,
+    no validated PT) the intervals stay posterior-on-rate. `docs/coverage_rescore.md`
+    carries the pre-registration.
+    """
     rows = []
     for role in roles:
         stages = stage_map[role]
@@ -368,8 +446,22 @@ def projections_frame(fits: dict, marcel: dict, roles: list[str], stage_map: dic
             pa = None if role == "H" else m_pt        # PA-like -> BF-like scale for FIP
             ip = None if role == "H" else np.maximum(m_pt, 1.0)
             stats = derived_stats(per_stage_h, role, env, pa=pa, ip=ip)
+            # h=1 only: predictive intervals via simulate_season at Marcel PT.
+            # h>=2 keeps the posterior-on-rate quantiles (rates-only display, no
+            # validated PT to condition on).
+            stats_pred = _predictive_stats_h1(per_stage_h, role, env, m_pt, seed=seed) \
+                if h == 1 else None
             for stat_name in STATS[role]:
-                q = _quantile_frame(np.asarray(stats[stat_name]))
+                q_rate = _quantile_frame(np.asarray(stats[stat_name]))
+                if stats_pred is not None:
+                    q_pred = _quantile_frame(np.asarray(stats_pred[stat_name]))
+                    # mean and q50 keep their posterior-on-rate semantics (talent-level
+                    # point summary; q50 lands on Marcel by construction of the anchor).
+                    # Interval bounds come from the predictive object.
+                    q = {"mean": q_rate["mean"], "q10": q_pred["q10"], "q25": q_pred["q25"],
+                         "q50": q_rate["q50"], "q75": q_pred["q75"], "q90": q_pred["q90"]}
+                else:
+                    q = q_rate
                 for i, pid in enumerate(ids):
                     rows.append({"mlbam_id": int(pid), "role": role,
                                  "season": projection_season + h - 1,
@@ -886,7 +978,7 @@ def run(window_end: int = 2026, horizons: int = 4, quick: bool = False,
                                {role: marcel_rates[role]}, [role], {role: stage_map[role]},
                                horizons, env[role], prod_tier,
                                projection_season=window_end + 1,
-                               marcel_pt={role: marcel_pt[role]})
+                               marcel_pt={role: marcel_pt[role]}, seed=seed)
         proj_rows.append(pr)
     projections = pd.concat(proj_rows, ignore_index=True) if proj_rows else pd.DataFrame()
     projections = join_pt_outlook(
