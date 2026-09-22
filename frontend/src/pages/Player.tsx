@@ -21,6 +21,22 @@ function h1Quantiles(p: PlayerResponse, stat: string) {
   return { q10: row?.q10 ?? null, q50: row?.q50 ?? null, q90: row?.q90 ?? null }
 }
 
+function isFin(v: number | null | undefined): v is number {
+  return v !== null && v !== undefined && Number.isFinite(v)
+}
+
+// A player's h=1 predictive interval is defined conditional on PA. When the playing-time
+// hurdle returns nothing (no MLB PT projected for the season), q10/q25/q75/q90 are undefined
+// and the API returns null for them. Detect that here so tiles/charts render the point
+// without pretending there's a band.
+function h1BandUndefined(p: PlayerResponse, stats: string[]): boolean {
+  for (const stat of stats) {
+    const row = (p.projections[stat] ?? []).find(r => r.horizon === 1)
+    if (row && (!isFin(row.q10) || !isFin(row.q90))) return true
+  }
+  return false
+}
+
 export default function Player() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
@@ -54,6 +70,8 @@ export default function Player() {
   }
 
   const age = bio.birth_date ? computeAge(bio.birth_date) : null
+  const noH1Band = h1BandUndefined(data, SUMMARY_STATS[currentRole])
+  const noH1BandNote = 'No MLB playing time projected, so no predictive interval at h=1.'
 
   return (
     <div>
@@ -78,17 +96,22 @@ export default function Player() {
             <div className="card primary">
               <div className="label">{statLabel(keyStat)} (h=1)</div>
               <div className="val">{fmtStat(keyStat, q.q50)}</div>
-              <div className="range">80%: {fmtRange(keyStat, q.q10, q.q90)}</div>
+              {isFin(q.q10) && isFin(q.q90)
+                ? <div className="range">80%: {fmtRange(keyStat, q.q10, q.q90)}</div>
+                : <div className="range muted">interval undefined</div>}
             </div>
           )
         })()}
         {SUMMARY_STATS[currentRole].filter(s => s !== keyStat).map(s => {
           const q = h1Quantiles(data, s)
+          const hasBand = isFin(q.q10) && isFin(q.q90)
           return (
             <div key={s} className="card">
               <div className="label">{statLabel(s)}</div>
               <div className="val">{fmtStat(s, q.q50)}</div>
-              <div className="range">{fmtRange(s, q.q10, q.q90)}</div>
+              {hasBand
+                ? <div className="range">{fmtRange(s, q.q10, q.q90)}</div>
+                : <div className="range muted">interval undefined</div>}
             </div>
           )
         })}
@@ -98,6 +121,7 @@ export default function Player() {
           <div className="range">Marcel PT</div>
         </div>
       </div>
+      {noH1Band && <div className="muted band-note">{noH1BandNote}</div>}
 
       <div className="card">
         <h2>{statLabel(keyStat)} — history & projection</h2>

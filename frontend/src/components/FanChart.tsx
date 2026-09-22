@@ -7,8 +7,13 @@ type Row = {
   hist?: number | null
   pa?: number | null
   median?: number | null
+  medianBandless?: number | null
   band80?: [number, number] | null
   band50?: [number, number] | null
+}
+
+function isFinite2(v: number | null | undefined): v is number {
+  return v !== null && v !== undefined && Number.isFinite(v)
 }
 
 function buildRows(history: HistoryRow[], proj: ProjectionRow[], stat: string): Row[] {
@@ -20,9 +25,14 @@ function buildRows(history: HistoryRow[], proj: ProjectionRow[], stat: string): 
   }
   for (const p of proj) {
     const r = bySeason.get(p.season) ?? { season: p.season }
-    r.median = p.q50
-    r.band80 = p.q10 !== null && p.q90 !== null ? [p.q10, p.q90] : null
-    r.band50 = p.q25 !== null && p.q75 !== null ? [p.q25, p.q75] : null
+    const band80 = isFinite2(p.q10) && isFinite2(p.q90) ? [p.q10, p.q90] as [number, number] : null
+    const band50 = isFinite2(p.q25) && isFinite2(p.q75) ? [p.q25, p.q75] as [number, number] : null
+    r.median = isFinite2(p.q50) ? p.q50 : null
+    r.band80 = band80
+    r.band50 = band50
+    // Bandless dot: h=1 projections with a defined point but no predictive interval
+    // (player has no MLB playing time projected, so an interval conditional on PA is undefined).
+    r.medianBandless = band80 === null && isFinite2(p.q50) ? p.q50 : null
     bySeason.set(p.season, r)
   }
   return Array.from(bySeason.values()).sort((a, b) => a.season - b.season)
@@ -84,13 +94,15 @@ export default function FanChart({
             <ReferenceLine y={league} stroke="#5c677d" strokeDasharray="4 4" ifOverflow="extendDomain" label={{ value: `Lg ${statLabel(stat)}`, fontSize: 10, fill: '#5c677d', position: 'insideTopRight' }} />
           )}
           <ReferenceLine x={windowEnd + 0.5} stroke="#5c677d" strokeDasharray="2 3" />
-          <Area type="monotone" dataKey="band80" stroke="none" fill="var(--band80)" isAnimationActive={false} connectNulls />
-          <Area type="monotone" dataKey="band50" stroke="none" fill="var(--band50)" isAnimationActive={false} connectNulls />
+          <Area type="monotone" dataKey="band80" stroke="none" fill="var(--band80)" isAnimationActive={false} />
+          <Area type="monotone" dataKey="band50" stroke="none" fill="var(--band50)" isAnimationActive={false} />
           <Line type="monotone" dataKey="median" stroke="#1f3a93" strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
           <Line type="monotone" dataKey="hist" stroke="#14213d" strokeWidth={1} dot={false} isAnimationActive={false} connectNulls />
           <Scatter dataKey="hist" shape={paDot as unknown as 'circle'} isAnimationActive={false} />
+          <Scatter dataKey="medianBandless" fill="#1f3a93" isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
 }
+

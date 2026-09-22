@@ -87,13 +87,28 @@
 | interview prep | $15 | Daniel fills in (Fable self-estimate ~$6: input ~230k, output ~18k) | ~$41 |
 
 ## Next command(s) for Daniel
-- **← NEXT (Daniel): `make project`** (~35 min). Rewrites
-  `data/artifacts/projections.parquet` with h=1 posterior-predictive quantiles
-  (`simulate_season` at Marcel PT), matching the object `interval_coverage` scores for
-  cov80. Mean and q50 keep their posterior-on-rate semantics; h=2..4 unchanged. No refit
-  authorised, no gate flip expected. After it finishes, spot-check any hitter's fan chart
-  — the h=1 80% range will be roughly √(rate_var² + binomial_var²) wider than before
-  (e.g. wOBA q90−q10 ≈ .09 vs the pre-fix ≈ .06). Nothing else needs to run.
+- **2026-09-22 — predictive intervals: post-`make project` follow-up (Opus).** Daniel's
+  `make project` wrote the parquet, but `assert_schema` failed loudly: 2029 h=1 rows had
+  non-finite q10/q25/q75/q90. Diagnosis: all 261 distinct players have `last_season == 2024`
+  and Marcel's PT hurdle returns nothing for them in 2027, so the predictive interval
+  (defined conditional on PA) is undefined by construction; mean/q50 stay finite because
+  they describe anchored talent. Fix applied: tighten `assert_schema` rather than relax it
+  (mean/q50 finite on every row; at h=1, q10/q25/q75/q90 finite exactly on rows with finite
+  `pt` — NaN quantile with finite pt still fails loudly; at h>=2 the band must be finite);
+  frontend renders the point without a band for those 261 players and surfaces a one-line
+  note ("no MLB playing time projected, so no predictive interval at h=1"); FanChart drops
+  `connectNulls` on the band Areas so the fill breaks cleanly at h=1, with a Scatter dot on
+  the median so the point stays visible; StatTable already routed q50 through `fmtStat` and
+  never rendered bands; `Leaderboard` filters by `pt >= min_pt` and so excludes them
+  naturally. `docs/coverage_rescore.md` §"Consequence of the predictive switch" and
+  `docs/research_memo.md` §5.0 record the semantics. Schema check re-run against the
+  written parquet passes without a refit; `make test` 81 pass; `npm run build` passes. No
+  regen needed on Daniel — the shipped parquet is already correct; the earlier failure was
+  in the check, not in the artifact.
+- **← NEXT (Daniel): nothing to run.** `make project` already succeeded on-disk; the fix
+  was to the schema check, the frontend and the docs. Optional: spot-check one of the 261
+  players in a browser (e.g. `/player/444482?role=H`) to confirm the h=1 point renders
+  without a band and the note appears above the fold.
 - **HOLDOUT ATTEMPT 1 WAS MISCONFIGURED (2026-09-18 14:53) — ruled invalid, not spent.**
   Daniel's `make holdout` raced the `handoff: M2c` commit (14:54) by one minute and ran the
   pre-wiring code: no flags, no guard → it scored 2025 with the OLD config (`mean3`,

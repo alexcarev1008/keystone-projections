@@ -850,11 +850,48 @@ def assert_schema(out_dir: Path) -> None:
             raise AssertionError(f"projections.parquet {c} outside [0, 1]")
     if (proj.pt_expected.dropna() < 0).any():
         raise AssertionError("projections.parquet pt_expected < 0")
-    qcols = ["mean", "q10", "q25", "q50", "q75", "q90"]
-    qv = pd.read_parquet(out_dir / "projections.parquet", columns=qcols).to_numpy(dtype=float)
-    n_bad = int((~np.isfinite(qv)).any(axis=1).sum())
-    if n_bad:
-        raise AssertionError(f"projections.parquet has {n_bad} rows with non-finite {qcols}")
+    # Point summary (mean, q50) must be finite on every row: it stays posterior-on-rate and
+    # is defined whether or not the player has projected playing time.
+    point_cols = ["mean", "q50"]
+    pv = pd.read_parquet(out_dir / "projections.parquet", columns=point_cols).to_numpy(dtype=float)
+    n_bad_point = int((~np.isfinite(pv)).any(axis=1).sum())
+    if n_bad_point:
+        raise AssertionError(
+            f"projections.parquet has {n_bad_point} rows with non-finite {point_cols}"
+        )
+    # Interval bounds (q10/q25/q75/q90) are posterior-predictive at h=1 (conditional on PA)
+    # and posterior-on-rate at h>=2 (rates-only display, no validated PT). At h=1 the band
+    # must be finite exactly on rows with a finite `pt` — a NaN band with finite pt is a real
+    # schema violation and must fail loudly; a NaN band with NaN pt is the correct undefined
+    # state for a player with no MLB playing time projected. At h>=2 `pt` is always NaN by
+    # construction (rates-only display) and the band must be finite.
+    band_cols = ["q10", "q25", "q75", "q90"]
+    band = pd.read_parquet(
+        out_dir / "projections.parquet", columns=band_cols + ["pt", "horizon"]
+    )
+    bv = band[band_cols].to_numpy(dtype=float)
+    band_finite = np.isfinite(bv).all(axis=1)
+    band_any_nan = (~np.isfinite(bv)).any(axis=1)
+    horizon = band["horizon"].to_numpy()
+    pt_finite = np.isfinite(band["pt"].to_numpy(dtype=float))
+    h1 = horizon == 1
+    n_bad_h1_finite_pt = int((h1 & pt_finite & band_any_nan).sum())
+    if n_bad_h1_finite_pt:
+        raise AssertionError(
+            f"projections.parquet has {n_bad_h1_finite_pt} h=1 rows with finite pt but "
+            f"non-finite {band_cols}"
+        )
+    n_bad_h1_nan_pt = int((h1 & ~pt_finite & band_finite).sum())
+    if n_bad_h1_nan_pt:
+        raise AssertionError(
+            f"projections.parquet has {n_bad_h1_nan_pt} h=1 rows with NaN pt but finite "
+            f"{band_cols} (predictive intervals are undefined without a PA to condition on)"
+        )
+    n_bad_h2 = int((~h1 & band_any_nan).sum())
+    if n_bad_h2:
+        raise AssertionError(
+            f"projections.parquet has {n_bad_h2} h>=2 rows with non-finite {band_cols}"
+        )
     meta = out_dir / "meta.json"
     if not meta.exists():
         raise AssertionError(f"missing artifact: {meta}")

@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-09-18T22:20:20+00:00",
- "data_through": "2026-09-18",
+ "generated_at": "2026-09-22T21:49:49+00:00",
+ "data_through": "2026-09-22",
  "window_end": 2026,
  "projection_season": 2027,
  "horizons": 4,
@@ -52,36 +52,37 @@
     {
      "venue_id": 3313,
      "venue_name": "Yankee Stadium",
-     "phi": 0.02085818332390819
+     "phi": 0.38496310529075334
     },
     {
      "venue_id": 22,
      "venue_name": "UNIQLO Field at Dodger Stadium",
-     "phi": -0.13967083444804487
+     "phi": 0.22443408751880026
     },
     {
      "venue_id": 2602,
      "venue_name": "Great American Ball Park",
-     "phi": -0.17611853344392964
+     "phi": 0.1879863885229155
     }
    ],
    "bottom_hr_parks": [
     {
      "venue_id": 7,
      "venue_name": "Kauffman Stadium",
-     "phi": -0.784501882586768
+     "phi": -0.4203969606199229
     },
     {
      "venue_id": 3309,
      "venue_name": "Nationals Park",
-     "phi": -0.6403883461758672
+     "phi": -0.276283424209022
     },
     {
      "venue_id": 2394,
      "venue_name": "Comerica Park",
-     "phi": -0.5826846741368173
+     "phi": -0.21857975216997222
     }
-   ]
+   ],
+   "phi_note": "centred: phi_reported = phi_raw - mean(phi_raw); only park differences are identified."
   },
   "H/hit_bip": {
    "tau_mean": 0.010527048172214988,
@@ -149,36 +150,37 @@
     {
      "venue_id": 2602,
      "venue_name": "Great American Ball Park",
-     "phi": 0.19441150752295427
+     "phi": 0.18588313229235148
     },
     {
      "venue_id": 3309,
      "venue_name": "Nationals Park",
-     "phi": 0.18855127646356906
+     "phi": 0.18002290123296627
     },
     {
      "venue_id": 2529,
      "venue_name": "Sutter Health Park",
-     "phi": 0.155423671737469
+     "phi": 0.1468952965068662
     }
    ],
    "bottom_hr_parks": [
     {
      "venue_id": 2395,
      "venue_name": "Oracle Park",
-     "phi": -0.24173098065278867
+     "phi": -0.2502593558833915
     },
     {
      "venue_id": 2889,
      "venue_name": "Busch Stadium",
-     "phi": -0.22711291949863735
+     "phi": -0.23564129472924014
     },
     {
      "venue_id": 31,
      "venue_name": "PNC Park",
-     "phi": -0.1035835993219629
+     "phi": -0.1121119745525657
     }
-   ]
+   ],
+   "phi_note": "centred: phi_reported = phi_raw - mean(phi_raw); only park differences are identified."
   },
   "P/hit_bip": {
    "tau_mean": 0.023450729783920474,

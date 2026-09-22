@@ -249,6 +249,20 @@ and learned from ≤ 960 rows.
    (item 2 below). The sequence of two corrections — first the docs, then the code — is the
    record: the artifact and the claim now describe the same object.
 
+   *Consequence of the switch.* A predictive interval is defined conditional on PA, so for
+   the 261 players whose last MLB game was in 2024 — the M3 playing-time hurdle projects
+   nothing for them in 2027 — q10/q25/q75/q90 at h=1 are now NaN by construction (mean and
+   q50 stay finite because they describe anchored talent, not a simulated season). Their
+   player pages render the point without a band and surface a one-line note ("no MLB
+   playing time projected, so no predictive interval at h=1"); leaderboards already filter
+   `pt >= min_pt` and so exclude them. `project.assert_schema` was tightened to enforce the
+   invariant rather than relaxed to hide it: mean/q50 finite everywhere, and at h=1 the
+   band must be finite exactly on rows with a finite pt (NaN band on a finite-pt row still
+   fails loudly). Inventing a PT floor or falling back to rate-space quantiles for the 261
+   would have put two different band semantics on the same page — the exact defect this
+   correction was written to eliminate. See `docs/coverage_rescore.md` §"Consequence of the
+   predictive switch".
+
 1. **The h2–h4 bands are model-implied and have never been backtested.** The backtest scores
    h = 1 only. The small taus on hit_bip (.0105) and xbh (.0198) [`CONTEXT.md` §6] mean the model
    says those talents barely drift. If that's wrong, the multi-year bands are too narrow. The

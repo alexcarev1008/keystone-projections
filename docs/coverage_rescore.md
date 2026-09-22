@@ -508,3 +508,59 @@ role×stat rows. See:
 `STATUS.md` records the sequence of two commits (pre-registration alone; then
 implementation + test + rescore + doc correction) and hands `make project` to Daniel to
 regenerate the shipped artifacts.
+
+## Consequence of the predictive switch — 261 players without an h=1 band
+
+Compute run 2026-09-22 against the freshly regenerated `data/artifacts/projections.parquet`
+(the first `make project` after the predictive-intervals change landed).
+
+A posterior-predictive interval at h=1 is defined **conditional on PA** (§"Two decisions to
+state up front" (1) above): the shipped bands come from `simulate_season` at each player's
+Marcel-projected playing time, matching the object `interval_coverage` scores. For a player
+whom the M3 playing-time hurdle returns nothing on for the projection season, PA is
+undefined; the predictive interval is therefore not merely missing but **undefined**. The
+point estimate remains meaningful — "what he would do if he played" — because mean and q50
+still describe the anchored talent draws and have no PA dependence.
+
+On the current artifact this shows up as **261 distinct players × ~7–8 stats = 2029 h=1
+rows** whose `q10/q25/q75/q90` are NaN while `mean` and `q50` are finite. Every one of the
+261 has `last_season == 2024` in `players.parquet` (`.venv/bin/python -c "…"` cross-check
+against `history.parquet` confirms: they have not appeared in an MLB game since 2024, and
+Marcel needs recent history to project PT). They still appear in `players.parquet` and are
+reachable via search and via `/api/players/{id}` because Marcel produces a talent line for
+them from 2022–2024 history; they simply have no projected 2027 PA.
+
+**This is the correct behaviour, not a regression.**
+
+- Inventing a playing-time floor to give them a nominal PA would fabricate an interval whose
+  width has no ground truth — the `interval_coverage` cov80 the memo cites was measured on
+  players with actual PA, so a floor-invented interval would not carry that coverage.
+- Falling back to the old posterior-on-rate quantiles for these 261 players would silently
+  put two different band semantics on the same page (rate for 261, predictive for 14238)
+  — the exact defect the post-fix re-score above was written to eliminate.
+
+**How the schema check enforces the invariant.** `project.assert_schema` was tightened in
+the same commit as this section:
+
+- `mean` and `q50` must be finite on every row (point summary is always defined; anchoring
+  provides it).
+- At h=1: `q10/q25/q75/q90` must be finite **exactly** on rows with a finite `pt`. A NaN
+  quantile with a finite `pt` still fails loudly (that would be a real schema violation);
+  a NaN quantile with a NaN `pt` is the correct undefined state.
+- At h>=2: `q10/q25/q75/q90` must be finite (rates-only display, no PA to condition on;
+  `pt` is NaN by construction here).
+
+**How the frontend handles it.** `FanChart` no longer bridges bands across NaN gaps
+(`connectNulls` dropped from the Area layers) and renders a Scatter dot at h=1 when the
+band is undefined so the point stays visible; `StatTable` already funnelled q50 through
+`fmtStat` (which returns "—" on non-finite) and never rendered bands; `Player.tsx` tiles
+show "interval undefined" in place of the "80%: —–—" range and surface a one-line note —
+*"No MLB playing time projected, so no predictive interval at h=1."* — above the fold.
+`Leaderboard` filters by `pt >= min_pt`, so the 261 are naturally excluded from
+leaderboards (NaN fails the comparison); only their individual pages surface the
+band-less state.
+
+**Rescore impact: none.** The 261 players are outside the eval intersection every
+`eval_population(target)` builds (PA'/BF' ≥ 200 in the target season), so they do not
+enter the post-fix cov80 = .830 / .803 numbers reported above. The predictive-switch
+verdict is unchanged; this is a rendering consequence, not a coverage one.
